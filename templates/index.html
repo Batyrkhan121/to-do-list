@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="card shadow-lg">
+    <div class="card-body">
+        <h3 class="text-center mb-4">📝 Мои задачи</h3>
+
+        <!-- Сообщения (успех, ошибки, предупреждения) -->
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <strong>
+                    {% if message.tags == 'success' %}✅{% endif %}
+                    {% if message.tags == 'error' %}❌{% endif %}
+                    {% if message.tags == 'warning' %}⚠️{% endif %}
+                    {% if message.tags == 'info' %}ℹ️{% endif %}
+                </strong>
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Форма добавления задачи -->
+        <form method="POST" class="task-form">
+            {% csrf_token %}
+            <div class="d-flex gap-2 mb-4">
+                <input 
+                    type="text" 
+                    name="title" 
+                    class="form-control" 
+                    placeholder="✨ Напиши новую задачу..." 
+                    required
+                    maxlength="200"
+                >
+                <input 
+                    type="date" 
+                    name="due_date" 
+                    class="form-control" 
+                    style="max-width: 200px;"
+                    title="Дата дедлайна"
+                >
+                <button type="submit" class="btn btn-primary">
+                    ➕ Добавить
+                </button>
+            </div>
+        </form>
+
+        <!-- Список задач -->
+        <ul class="list-group">
+            {% for task in tasks %}
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div class="flex-grow-1">
+                    <span class="{% if task.is_completed %}task-done{% endif %}">
+                        {% if task.is_completed %}✔️{% else %}⭕{% endif %}
+                        {{ task.title }}
+                    </span>
+                    {% if task.due_date %}
+                    <small class="text-muted ms-2">
+                        📅 {{ task.due_date|date:"d.m.Y" }}
+                        {% if task.is_overdue and not task.is_completed %}
+                        <span class="badge bg-danger ms-1">⚠️ Просрочено!</span>
+                        {% endif %}
+                    </small>
+                    {% endif %}
+                </div>
+                <div class="d-flex gap-2">
+                    <a 
+                        href="{% url 'complete_task' task.id %}" 
+                        class="btn btn-sm {% if task.is_completed %}btn-secondary{% else %}btn-success{% endif %}" 
+                        title="{% if task.is_completed %}Вернуть в работу{% else %}Выполнено{% endif %}"
+                    >
+                        {% if task.is_completed %}↩️{% else %}✓{% endif %}
+                    </a>
+                    <a 
+                        href="{% url 'delete_task' task.id %}" 
+                        class="btn btn-sm btn-danger" 
+                        title="Удалить"
+                        onclick="return confirm('🗑️ Точно удалить задачу \"{{ task.title }}\"?')"
+                    >
+                        ✕
+                    </a>
+                </div>
+            </li>
+            {% empty %}
+            <li class="list-group-item text-center text-muted">
+                <div style="padding: 2rem;">
+                    <div style="font-size: 3rem; margin-bottom: 1rem;">😎</div>
+                    <div style="font-size: 1.2rem; font-weight: 600;">Задач пока нет!</div>
+                    <div style="color: #9ca3af; margin-top: 0.5rem;">Отдыхай или создай новую задачу</div>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <!-- Статистика -->
+        {% if tasks %}
+        <div class="mt-4 text-center">
+            <small style="display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap;">
+                <span>📊 <strong>Всего:</strong> {{ tasks.count }}</span>
+                <span>✅ <strong>Выполнено:</strong> {% widthratio tasks|length tasks.count 100 %}%</span>
+                <span>⏳ <strong>В работе:</strong> {{ tasks.count }}</span>
+            </small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Floating Action Button (опционально) -->
+<style>
+.fab {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    font-size: 1.5rem;
+    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: none; /* Показывать при скролле */
+}
+
+.fab:hover {
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 12px 35px rgba(102, 126, 234, 0.6);
+}
+</style>
+
+{% endblock %}

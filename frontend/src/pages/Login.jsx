@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -9,19 +11,56 @@ export default function Login() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
+  const [captchaToken, setCaptchaToken] = useState(null);
+  const [siteKey, setSiteKey] = useState('');
+
+  const recaptchaRef = useRef(null);
+
   const { login, loginWithGoogle, loginWithGithub, oauthUrls } = useAuth();
   const navigate = useNavigate();
+
+  // Get reCAPTCHA key from backend
+  useEffect(() => {
+    const fetchSiteKey = async () => {
+      try {
+        const response = await api.get('/auth/recaptcha-key/');
+        setSiteKey(response.data.site_key);
+      } catch (error) {
+        console.log('reCAPTCHA not configured');
+      }
+    };
+    fetchSiteKey();
+  }, []);
+
+  const handleCaptchaChange = (token) => {
+    setCaptchaToken(token);
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (siteKey && !captchaToken) {
+      setError('Please complete the reCAPTCHA verification');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, captchaToken);
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      const data = err.response?.data;
+      const captchaError = data?.captcha;
+      setError(captchaError || data?.error || 'Login failed');
+
+      if (captchaError) {
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
+        }
+        setCaptchaToken(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -73,6 +112,18 @@ export default function Login() {
 
         {/* Social Login Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
+          {/* reCAPTCHA */}
+          {siteKey && (
+            <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
+              <ReCAPTCHA
+                ref={recaptchaRef}
+                sitekey={siteKey}
+                onChange={handleCaptchaChange}
+                onExpired={() => setCaptchaToken(null)}
+              />
+            </div>
+          )}
+
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}

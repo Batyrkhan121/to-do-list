@@ -65,6 +65,37 @@ def login(request):
         email = serializer.validated_data['email']
         password = serializer.validated_data['password']
         
+        # reCAPTCHA verification (enabled when RECAPTCHA_PRIVATE_KEY is set)
+        captcha_token = request.data.get('captcha_token')
+        if getattr(settings, 'RECAPTCHA_PRIVATE_KEY', ''):
+            if not captcha_token:
+                return Response(
+                    {'captcha': 'Please complete the reCAPTCHA verification.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            try:
+                captcha_response = http_requests.post(
+                    'https://www.google.com/recaptcha/api/siteverify',
+                    data={
+                        'secret': settings.RECAPTCHA_PRIVATE_KEY,
+                        'response': captcha_token,
+                    },
+                    timeout=10,
+                )
+                captcha_result = captcha_response.json()
+            except Exception:
+                return Response(
+                    {'captcha': 'reCAPTCHA verification error.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not captcha_result.get('success'):
+                return Response(
+                    {'captcha': 'reCAPTCHA verification failed.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:

@@ -131,6 +131,11 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# Serve the built React app (Vite) files from the site root.
+# This lets requests like /assets/... resolve without needing a separate Static Site.
+WHITENOISE_ROOT = BASE_DIR / 'frontend' / 'dist'
+
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Site ID для allauth

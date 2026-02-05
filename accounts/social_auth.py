@@ -122,7 +122,6 @@ def github_auth(request):
 
     github_client_id = settings.SOCIALACCOUNT_PROVIDERS['github']['APP']['client_id']
     github_client_secret = settings.SOCIALACCOUNT_PROVIDERS['github']['APP']['secret']
-    github_client_secret = settings.SOCIALACCOUNT_PROVIDERS['github']['APP']['secret']
     if not github_client_id or not github_client_secret:
         return Response(
             {'error': 'GitHub OAuth is not configured'},
@@ -217,18 +216,27 @@ def get_oauth_urls(request):
     """Возвращает URL для OAuth авторизации"""
     google_client_id = settings.SOCIALACCOUNT_PROVIDERS['google']['APP']['client_id']
     github_client_id = settings.SOCIALACCOUNT_PROVIDERS['github']['APP']['client_id']
-    
-    frontend_url = settings.FRONTEND_URL
+    github_client_secret = settings.SOCIALACCOUNT_PROVIDERS['github']['APP']['secret']
+
+    frontend_url = settings.FRONTEND_URL.rstrip('/')
     google_configured = bool(google_client_id)
     github_configured = bool(github_client_id and github_client_secret)
-    
+
     return Response({
         'google': {
-            'auth_url': f"https://accounts.google.com/o/oauth2/v2/auth?client_id={google_client_id}&redirect_uri={frontend_url}/auth/google/callback&response_type=token&scope=email%20profile" if google_configured else '',
+            'auth_url': (
+                f"https://accounts.google.com/o/oauth2/v2/auth?client_id={google_client_id}"
+                f"&redirect_uri={frontend_url}/auth/google/callback"
+                f"&response_type=token&scope=email%20profile"
+            ) if google_configured else '',
             'configured': google_configured
         },
         'github': {
-            'auth_url': f"https://github.com/login/oauth/authorize?client_id={github_client_id}&redirect_uri={frontend_url}/auth/github/callback&scope=user:email" if github_configured else '',
+            'auth_url': (
+                f"https://github.com/login/oauth/authorize?client_id={github_client_id}"
+                f"&redirect_uri={frontend_url}/auth/github/callback"
+                f"&scope=user:email"
+            ) if github_configured else '',
             'configured': github_configured
         }
     })

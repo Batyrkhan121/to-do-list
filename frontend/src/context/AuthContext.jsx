@@ -27,9 +27,7 @@ export function AuthProvider({ children }) {
     const token = localStorage.getItem('access_token');
     if (token) {
       try {
-        const response = await api.get('/auth/me/', {
-          headers: { Authorization: Bearer  },
-        });
+        const response = await api.get('/auth/me/');
         setUser(response.data);
         setPermissions(response.data.permissions || {});
       } catch (error) {
@@ -50,9 +48,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('refresh_token', refresh);
     setUser(loggedInUser);
 
-    const meResponse = await api.get('/auth/me/', {
-      headers: { Authorization: Bearer  },
-    });
+    const meResponse = await api.get('/auth/me/');
     setUser(meResponse.data);
     setPermissions(meResponse.data.permissions || {});
 
@@ -69,11 +65,7 @@ export function AuthProvider({ children }) {
       const refresh = localStorage.getItem('refresh_token');
       await api.post(
         '/auth/logout/',
-        { refresh },
-        {
-          headers: { Authorization: Bearer  },
-        }
-      );
+        { refresh });
     } catch (error) {
       // Ignore
     }
@@ -91,11 +83,7 @@ export function AuthProvider({ children }) {
         old_password: oldPassword,
         new_password: newPassword,
         new_password2: newPassword2,
-      },
-      {
-        headers: { Authorization: Bearer  },
-      }
-    );
+      });
     return response.data;
   };
 
@@ -115,9 +103,7 @@ export function AuthProvider({ children }) {
   };
 
   const updateProfile = async (data) => {
-    const response = await api.patch('/auth/profile/', data, {
-      headers: { Authorization: Bearer  },
-    });
+    const response = await api.patch('/auth/profile/', data);
     setUser(response.data);
     return response.data;
   };

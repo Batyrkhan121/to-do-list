@@ -189,24 +189,28 @@ ACCOUNT_EMAIL_VERIFICATION = 'none'  # Для разработки
 ACCOUNT_UNIQUE_EMAIL = True
 
 # Social Auth Providers
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '').strip()
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '').strip()
+GITHUB_CLIENT_ID = os.environ.get('GITHUB_CLIENT_ID', '').strip()
+GITHUB_CLIENT_SECRET = os.environ.get('GITHUB_CLIENT_SECRET', '').strip()
+
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
         'SCOPE': ['profile', 'email'],
         'AUTH_PARAMS': {'access_type': 'online'},
         'APP': {
-            'client_id': '',  # Заполни после получения
-            'secret': '',     # Заполни после получения
-        }
+            'client_id': GOOGLE_CLIENT_ID,
+            'secret': GOOGLE_CLIENT_SECRET,
+        },
     },
     'github': {
         'SCOPE': ['user', 'user:email'],
         'APP': {
-            'client_id': '',  # Заполни после получения
-            'secret': '',     # Заполни после получения
-        }
-    }
+            'client_id': GITHUB_CLIENT_ID,
+            'secret': GITHUB_CLIENT_SECRET,
+        },
+    },
 }
-
 # Email (консоль для разработки)
 # ==================== EMAIL SETTINGS ====================
 # Для разработки (выводит в консоль):

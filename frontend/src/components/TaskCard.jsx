@@ -55,7 +55,6 @@ export default function TaskCard({ task, onComplete, onEdit }) {
         <div style={{ flex: 1 }}>
           <h3 style={{ 
             fontWeight: '500', 
-            color: '#0f172a', 
             margin: 0,
             textDecoration: task.is_completed ? 'line-through' : 'none',
             color: task.is_completed ? '#94a3b8' : '#0f172a'
@@ -76,10 +75,10 @@ export default function TaskCard({ task, onComplete, onEdit }) {
           {/* Meta */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', fontSize: '12px', color: '#64748b' }}>
             {task.due_date && (
-              <span>📅 {task.due_date}</span>
+              <span>Due: {task.due_date}</span>
             )}
             {task.responsible?.username && (
-              <span>👤 {task.responsible.username}</span>
+              <span>Assignee: {task.responsible.username}</span>
             )}
           </div>
         </div>

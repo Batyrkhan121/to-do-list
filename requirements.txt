@@ -9,6 +9,7 @@ drf-yasg>=1.21.0
 django-recaptcha==4.1.0
 python-dateutil>=2.8.0
 requests
+cryptography
 gunicorn
 whitenoise
 dj-database-url

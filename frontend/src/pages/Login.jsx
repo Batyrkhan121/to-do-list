@@ -273,7 +273,10 @@ export default function Login() {
         {/* Register link */}
         <p style={{ textAlign: 'center', marginTop: '24px', color: '#64748b', fontSize: '14px' }}>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#0ea5e9', fontWeight: '500', textDecoration: 'none' }}>
+          <Link
+            to={location.search ? `/register${location.search}` : '/register'}
+            style={{ color: '#0ea5e9', fontWeight: '500', textDecoration: 'none' }}
+          >
             Sign up
           </Link>
         </p>

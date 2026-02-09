@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
@@ -23,6 +23,7 @@ export default function Register() {
   const recaptchaRef = useRef(null);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Получаем ключ reCAPTCHA с сервера
   useEffect(() => {
@@ -73,7 +74,8 @@ export default function Register() {
         ...formData,
         captcha_token: captchaToken
       });
-      navigate('/login', { state: { message: 'Registration successful! Please login.' } });
+      const loginPath = location.search ? `/login${location.search}` : '/login';
+      navigate(loginPath, { state: { message: 'Registration successful! Please login.' } });
     } catch (err) {
       const errors = err.response?.data;
       if (errors) {
@@ -318,7 +320,10 @@ export default function Register() {
         {/* Login link */}
         <p style={{ textAlign: 'center', marginTop: '24px', color: '#64748b', fontSize: '14px' }}>
           Already have an account?{' '}
-          <Link to="/login" style={{ color: '#0ea5e9', fontWeight: '500', textDecoration: 'none' }}>
+          <Link
+            to={location.search ? `/login${location.search}` : '/login'}
+            style={{ color: '#0ea5e9', fontWeight: '500', textDecoration: 'none' }}
+          >
             Sign in
           </Link>
         </p>

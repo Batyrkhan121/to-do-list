@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,12 @@ export default function Login() {
 
   const { login, loginWithGoogle, loginWithGithub, oauthUrls } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const nextPath = (() => {
+    const value = new URLSearchParams(location.search).get('next');
+    return value && value.startsWith('/') ? value : '/';
+  })();
 
   // Get reCAPTCHA key from backend
   useEffect(() => {
@@ -49,7 +55,7 @@ export default function Login() {
 
     try {
       await login(email, password, captchaToken);
-      navigate('/');
+      navigate(nextPath);
     } catch (err) {
       const data = err.response?.data;
       const captchaError = data?.captcha;

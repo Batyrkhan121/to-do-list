@@ -197,6 +197,27 @@ export const useDeleteTeam = () => {
   });
 };
 
+export const useTeamInviteInfo = (id) => {
+  return useQuery({
+    queryKey: ['team-invite', id],
+    queryFn: () => teamsApi.getInviteInfo(id).then(res => res.data),
+    enabled: !!id,
+  });
+};
+
+export const useJoinTeam = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (teamId) => teamsApi.join(teamId).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+  });
+};
+
 // ============ CATEGORIES ============
 export const useCategories = () => {
   return useQuery({

@@ -83,6 +83,8 @@ export const teamsApi = {
   create: (data) => api.post('/v1/teams/', data),
   update: (id, data) => api.patch(`/v1/teams/${id}/`, data),
   delete: (id) => api.delete(`/v1/teams/${id}/`),
+  getInviteInfo: (id) => api.get(`/v1/teams/${id}/invite/`),
+  join: (id) => api.post(`/v1/teams/${id}/join/`),
 };
 
 // Categories API

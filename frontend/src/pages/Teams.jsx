@@ -20,8 +20,7 @@ export default function Teams() {
     try {
       await createTeam.mutateAsync({ 
         name, 
-        description,
-        team_lead_id: 1
+        description
       });
       setIsModalOpen(false);
       setName('');

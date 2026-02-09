@@ -38,7 +38,8 @@ class TeamDetailSerializer(serializers.ModelSerializer):
     team_lead_id = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         source='team_lead',
-        write_only=True
+        write_only=True,
+        required=False
     )
     members = UserSerializer(many=True, read_only=True)
     member_ids = serializers.PrimaryKeyRelatedField(

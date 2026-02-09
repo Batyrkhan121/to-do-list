@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, filters
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 from django.utils import timezone
@@ -26,17 +27,38 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
 
 class TeamViewSet(viewsets.ModelViewSet):
-    queryset = Team.objects.all()
-    permission_classes = [AllowAny]
+    queryset = Team.objects.select_related('team_lead').prefetch_related('members').all()
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['is_active', 'team_lead']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
 
+    def get_queryset(self):
+        user = self.request.user
+        return self.queryset.filter(
+            Q(team_lead=user) | Q(members=user)
+        ).distinct()
+
     def get_serializer_class(self):
         if self.action == 'list':
             return TeamListSerializer
         return TeamDetailSerializer
+
+    def perform_create(self, serializer):
+        team = serializer.save(team_lead=self.request.user)
+        team.members.add(self.request.user)
+
+    def perform_update(self, serializer):
+        team = self.get_object()
+        if not (self.request.user.is_superuser or team.team_lead_id == self.request.user.id):
+            raise PermissionDenied("Only the team lead can update this team.")
+        serializer.save(team_lead=team.team_lead)
+
+    def perform_destroy(self, instance):
+        if not (self.request.user.is_superuser or instance.team_lead_id == self.request.user.id):
+            raise PermissionDenied("Only the team lead can delete this team.")
+        instance.delete()
 
     @action(detail=True, methods=['get'])
     def tasks(self, request, pk=None):
@@ -52,14 +74,58 @@ class TeamViewSet(viewsets.ModelViewSet):
         serializer = ProjectListSerializer(projects, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'])
+    def invite(self, request, pk=None):
+        try:
+            team = Team.objects.select_related('team_lead').get(pk=pk, is_active=True)
+        except Team.DoesNotExist:
+            return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        is_member = team.team_lead_id == request.user.id or team.members.filter(id=request.user.id).exists()
+        return Response({
+            "id": team.id,
+            "name": team.name,
+            "description": team.description,
+            "team_lead": team.team_lead.username,
+            "member_count": team.member_count,
+            "is_member": is_member,
+        })
+
+    @action(detail=True, methods=['post'])
+    def join(self, request, pk=None):
+        try:
+            team = Team.objects.select_related('team_lead').get(pk=pk, is_active=True)
+        except Team.DoesNotExist:
+            return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if team.team_lead_id == request.user.id or team.members.filter(id=request.user.id).exists():
+            return Response({
+                "detail": "You are already a team member",
+                "team_id": team.id,
+                "team_name": team.name,
+            })
+
+        team.members.add(request.user)
+        return Response({
+            "detail": "Joined team successfully",
+            "team_id": team.id,
+            "team_name": team.name,
+        }, status=status.HTTP_200_OK)
+
 
 class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.select_related('team', 'responsible', 'category').all()
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'priority', 'is_completed', 'team', 'responsible', 'category']
     search_fields = ['title', 'description']
     ordering_fields = ['due_date', 'priority', 'created_at', 'status']
+
+    def get_queryset(self):
+        user = self.request.user
+        return self.queryset.filter(
+            Q(team__team_lead=user) | Q(team__members=user)
+        ).distinct()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -67,6 +133,38 @@ class TaskViewSet(viewsets.ModelViewSet):
         if self.action == 'create':
             return TaskCreateSerializer
         return TaskDetailSerializer
+
+    def _validate_team_access(self, team, responsible):
+        if team is None:
+            raise ValidationError({"team": "Team is required."})
+
+        user = self.request.user
+        is_team_member = team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
+        if not is_team_member and not user.is_superuser:
+            raise PermissionDenied("You are not a member of this team.")
+
+        if responsible:
+            is_responsible_in_team = (
+                responsible.id == team.team_lead_id or
+                team.members.filter(id=responsible.id).exists()
+            )
+            if not is_responsible_in_team:
+                raise ValidationError({
+                    "responsible": "Responsible user must belong to the selected team."
+                })
+
+    def perform_create(self, serializer):
+        team = serializer.validated_data.get('team')
+        responsible = serializer.validated_data.get('responsible')
+        self._validate_team_access(team, responsible)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        current_task = self.get_object()
+        team = serializer.validated_data.get('team', current_task.team)
+        responsible = serializer.validated_data.get('responsible', current_task.responsible)
+        self._validate_team_access(team, responsible)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def complete(self, request, pk=None):
@@ -102,16 +200,42 @@ class TaskViewSet(viewsets.ModelViewSet):
 
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.select_related('team').prefetch_related('tasks').all()
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['status', 'team']
     search_fields = ['project_title', 'description']
     ordering_fields = ['deadline', 'created_at', 'status']
 
+    def get_queryset(self):
+        user = self.request.user
+        return self.queryset.filter(
+            Q(team__team_lead=user) | Q(team__members=user)
+        ).distinct()
+
     def get_serializer_class(self):
         if self.action == 'list':
             return ProjectListSerializer
         return ProjectDetailSerializer
+
+    def _validate_team_access(self, team):
+        if team is None:
+            raise ValidationError({"team": "Team is required."})
+
+        user = self.request.user
+        is_team_member = team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
+        if not is_team_member and not user.is_superuser:
+            raise PermissionDenied("You are not a member of this team.")
+
+    def perform_create(self, serializer):
+        team = serializer.validated_data.get('team')
+        self._validate_team_access(team)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        current_project = self.get_object()
+        team = serializer.validated_data.get('team', current_project.team)
+        self._validate_team_access(team)
+        serializer.save()
 
     @action(detail=True, methods=['post'])
     def start(self, request, pk=None):
@@ -125,12 +249,15 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project = self.get_object()
         task_id = request.data.get('task_id')
         try:
-            task = Task.objects.get(id=task_id)
+            task = Task.objects.get(id=task_id, team=project.team)
             project.tasks.add(task)
             serializer = ProjectDetailSerializer(project)
             return Response(serializer.data)
         except Task.DoesNotExist:
-            return Response({"detail": "Task not found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Task not found in this project team"},
+                status=status.HTTP_404_NOT_FOUND
+            )
 
 
 class CalendarEventViewSet(viewsets.ModelViewSet):
@@ -150,33 +277,40 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
 
 
 @api_view(['GET'])
-@permission_classes([AllowAny])
+@permission_classes([IsAuthenticated])
 def dashboard_stats(request):
     today = timezone.now().date()
-    
-    total_tasks = Task.objects.count()
-    completed_tasks = Task.objects.filter(is_completed=True).count()
-    overdue_tasks = Task.objects.filter(due_date__lt=today, is_completed=False).count()
-    in_progress_tasks = Task.objects.filter(status='progress').count()
-    
-    total_projects = Project.objects.count()
-    active_projects = Project.objects.filter(status='active').count()
-    total_teams = Team.objects.filter(is_active=True).count()
-    
+
+    user_teams = Team.objects.filter(
+        Q(team_lead=request.user) | Q(members=request.user)
+    ).distinct()
+
+    visible_tasks = Task.objects.filter(team__in=user_teams).distinct()
+    visible_projects = Project.objects.filter(team__in=user_teams).distinct()
+
+    total_tasks = visible_tasks.count()
+    completed_tasks = visible_tasks.filter(is_completed=True).count()
+    overdue_tasks = visible_tasks.filter(due_date__lt=today, is_completed=False).count()
+    in_progress_tasks = visible_tasks.filter(status='progress').count()
+
+    total_projects = visible_projects.count()
+    active_projects = visible_projects.filter(status='active').count()
+    total_teams = user_teams.filter(is_active=True).count()
+
     tasks_by_priority = dict(
-        Task.objects.values('priority')
+        visible_tasks.values('priority')
         .annotate(count=Count('id'))
         .values_list('priority', 'count')
     )
-    
+
     tasks_by_status = dict(
-        Task.objects.values('status')
+        visible_tasks.values('status')
         .annotate(count=Count('id'))
         .values_list('status', 'count')
     )
-    
-    recent_tasks = Task.objects.order_by('-created_at')[:5]
-    
+
+    recent_tasks = visible_tasks.order_by('-created_at')[:5]
+
     data = {
         'total_tasks': total_tasks,
         'completed_tasks': completed_tasks,

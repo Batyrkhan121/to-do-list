@@ -13,6 +13,7 @@ export default function Login() {
   
   const [captchaToken, setCaptchaToken] = useState(null);
   const [siteKey, setSiteKey] = useState('');
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
 
   const recaptchaRef = useRef(null);
 
@@ -30,7 +31,8 @@ export default function Login() {
     const fetchSiteKey = async () => {
       try {
         const response = await api.get('/auth/recaptcha-key/');
-        setSiteKey(response.data.site_key);
+        setSiteKey(response.data.site_key || '');
+        setCaptchaEnabled(Boolean(response.data.enabled));
       } catch (error) {
         console.log('reCAPTCHA not configured');
       }
@@ -46,7 +48,7 @@ export default function Login() {
     e.preventDefault();
     setError('');
 
-    if (siteKey && !captchaToken) {
+    if (captchaEnabled && !captchaToken) {
       setError('Please complete the reCAPTCHA verification');
       return;
     }
@@ -119,7 +121,7 @@ export default function Login() {
         {/* Social Login Buttons */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px' }}>
           {/* reCAPTCHA */}
-          {siteKey && (
+          {captchaEnabled && siteKey && (
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
               <ReCAPTCHA
                 ref={recaptchaRef}

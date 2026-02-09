@@ -10,7 +10,13 @@ from .social_auth import google_auth, github_auth, get_oauth_urls
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def get_recaptcha_key(request):
-    return Response({'site_key': getattr(settings, 'RECAPTCHA_PUBLIC_KEY', '')})
+    public_key = getattr(settings, 'RECAPTCHA_PUBLIC_KEY', '')
+    private_key = getattr(settings, 'RECAPTCHA_PRIVATE_KEY', '')
+    enabled = bool(public_key and private_key)
+    return Response({
+        'site_key': public_key if enabled else '',
+        'enabled': enabled,
+    })
 
 
 urlpatterns = [

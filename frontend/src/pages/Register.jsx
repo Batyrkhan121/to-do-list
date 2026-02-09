@@ -18,6 +18,7 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState(null);
   const [siteKey, setSiteKey] = useState('');
+  const [captchaEnabled, setCaptchaEnabled] = useState(false);
   
   const recaptchaRef = useRef(null);
   const { register } = useAuth();
@@ -28,7 +29,8 @@ export default function Register() {
     const fetchSiteKey = async () => {
       try {
         const response = await api.get('/auth/recaptcha-key/');
-        setSiteKey(response.data.site_key);
+        setSiteKey(response.data.site_key || '');
+        setCaptchaEnabled(Boolean(response.data.enabled));
       } catch (error) {
         console.log('reCAPTCHA not configured');
       }
@@ -59,7 +61,7 @@ export default function Register() {
     }
 
     // Проверяем captcha если она настроена
-    if (siteKey && !captchaToken) {
+    if (captchaEnabled && !captchaToken) {
       setError("Please complete the reCAPTCHA verification");
       return;
     }
@@ -86,6 +88,8 @@ export default function Register() {
           const firstError = Object.values(errors)[0];
           setError(Array.isArray(firstError) ? firstError[0] : firstError);
         }
+      } else if (err.response?.status === 400) {
+        setError('Bad request. Please check all fields and try again.');
       } else {
         setError('Registration failed');
       }
@@ -255,7 +259,7 @@ export default function Register() {
           </div>
 
           {/* reCAPTCHA */}
-          {siteKey && (
+          {captchaEnabled && siteKey && (
             <div style={{ marginBottom: '24px', display: 'flex', justifyContent: 'center' }}>
               <ReCAPTCHA
                 ref={recaptchaRef}

@@ -149,10 +149,11 @@ export const useRemoveTaskFromProject = () => {
 };
 
 // ============ TEAMS ============
-export const useTeams = () => {
+export const useTeams = (params = {}, options = {}) => {
   return useQuery({
-    queryKey: ['teams'],
-    queryFn: () => teamsApi.getAll().then(res => res.data),
+    queryKey: ['teams', params],
+    queryFn: () => teamsApi.getAll(params).then(res => res.data),
+    ...options,
   });
 };
 

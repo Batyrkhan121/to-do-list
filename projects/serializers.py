@@ -26,11 +26,12 @@ class CategorySerializer(serializers.ModelSerializer):
 
 class TeamListSerializer(serializers.ModelSerializer):
     team_lead = UserSerializer(read_only=True)
+    members = UserSerializer(many=True, read_only=True)
     member_count = serializers.ReadOnlyField()
 
     class Meta:
         model = Team
-        fields = ['id', 'name', 'team_lead', 'member_count', 'is_active', 'created_at']
+        fields = ['id', 'name', 'team_lead', 'members', 'member_count', 'is_active', 'created_at']
 
 
 class TeamDetailSerializer(serializers.ModelSerializer):

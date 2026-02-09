@@ -9,7 +9,10 @@ export default function Teams() {
   const [description, setDescription] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
-  const { data, isLoading } = useTeams();
+  const { data, isLoading } = useTeams({}, {
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  });
   const createTeam = useCreateTeam();
   const deleteTeam = useDeleteTeam();
 
@@ -133,6 +136,21 @@ export default function Teams() {
                       {team.is_active ? 'Active' : 'Inactive'}
                     </p>
                   </div>
+                </div>
+
+                <div style={{ marginTop: '12px' }}>
+                  <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                    Team members
+                  </p>
+                  {team.members?.length ? (
+                    <p style={{ margin: 0, fontSize: '13px', color: '#334155' }}>
+                      {team.members.map(member => member.username).join(', ')}
+                    </p>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>
+                      No members yet
+                    </p>
+                  )}
                 </div>
 
                 {/* Invite link button */}

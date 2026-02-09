@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Calendar from './pages/Calendar';
@@ -46,6 +46,14 @@ function ProtectedRoute({ children }) {
 // Публичный маршрут (редирект если залогинен)
 function PublicRoute({ children }) {
   const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
+
+  const nextPath = (() => {
+    const value = new URLSearchParams(location.search).get('next');
+    if (!value || !value.startsWith('/')) return '/';
+    if (value.startsWith('/login')) return '/';
+    return value;
+  })();
 
   if (loading) {
     return (
@@ -61,7 +69,7 @@ function PublicRoute({ children }) {
   }
 
   if (isAuthenticated) {
-    return <Navigate to="/" />;
+    return <Navigate to={nextPath} replace />;
   }
 
   return children;

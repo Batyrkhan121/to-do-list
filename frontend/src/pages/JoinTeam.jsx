@@ -13,6 +13,7 @@ export default function JoinTeam() {
   const [localMessage, setLocalMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
   const [joined, setJoined] = useState(false);
+  const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
 
   const joinTeam = useJoinTeam();
   const inviteTeamId = isAuthenticated ? teamId : null;
@@ -57,6 +58,37 @@ export default function JoinTeam() {
       setLocalMessage(getApiError(error));
     }
   };
+
+  useEffect(() => {
+    if (loading || !isAuthenticated) return;
+    if (!inviteInfo || inviteInfo.is_member || joined || autoJoinAttempted) return;
+
+    setAutoJoinAttempted(true);
+
+    const joinAutomatically = async () => {
+      setLocalMessage('');
+      setMessageType('info');
+      try {
+        const result = await joinTeam.mutateAsync(teamId);
+        setJoined(true);
+        setMessageType('success');
+        setLocalMessage(result?.detail || 'You have joined this team.');
+      } catch (error) {
+        setMessageType('error');
+        setLocalMessage(getApiError(error));
+      }
+    };
+
+    joinAutomatically();
+  }, [
+    loading,
+    isAuthenticated,
+    inviteInfo,
+    joined,
+    autoJoinAttempted,
+    joinTeam,
+    teamId,
+  ]);
 
   if (loading || !isAuthenticated) {
     return (

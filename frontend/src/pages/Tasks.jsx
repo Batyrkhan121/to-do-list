@@ -18,6 +18,23 @@ export default function Tasks() {
 
   const tasks = data?.results || data || [];
 
+  const getApiErrorMessage = (error) => {
+    const responseData = error?.response?.data;
+    if (!responseData) return error.message;
+    if (typeof responseData === 'string') return responseData;
+    if (typeof responseData.detail === 'string') return responseData.detail;
+
+    const [firstField] = Object.keys(responseData);
+    if (!firstField) return error.message;
+
+    const fieldValue = responseData[firstField];
+    if (Array.isArray(fieldValue) && fieldValue.length > 0) {
+      return `${firstField}: ${fieldValue[0]}`;
+    }
+
+    return `${firstField}: ${String(fieldValue)}`;
+  };
+
   const handleCreate = () => {
     setEditingTask(null);
     setIsModalOpen(true);
@@ -38,7 +55,7 @@ export default function Tasks() {
       setIsModalOpen(false);
       setEditingTask(null);
     } catch (error) {
-      alert('Error: ' + (error.response?.data?.detail || error.message));
+      alert(`Error: ${getApiErrorMessage(error)}`);
     }
   };
 

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useTeams, useCategories } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 
 export default function TaskForm({ task, onSubmit, onCancel }) {
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     team: '',
-    responsible: 1,
+    responsible: '',
     category: '',
     status: 'todo',
     priority: 'medium',
@@ -24,15 +26,24 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
       setFormData({
         title: task.title || '',
         description: task.description || '',
-        team: task.team?.id || task.team || '',
-        responsible: task.responsible?.id || task.responsible || 1,
+        team: task.team?.id || task.team_id || task.team || '',
+        responsible: task.responsible?.id || task.responsible || user?.id || '',
         category: task.category?.id || task.category || '',
         status: task.status || 'todo',
         priority: task.priority || 'medium',
         due_date: task.due_date || '',
       });
     }
-  }, [task]);
+  }, [task, user?.id]);
+
+  useEffect(() => {
+    if (!task && user?.id) {
+      setFormData((prev) => ({
+        ...prev,
+        responsible: prev.responsible || user.id,
+      }));
+    }
+  }, [task, user?.id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -42,10 +53,14 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const data = {
-      ...formData,
+      title: formData.title.trim(),
+      description: formData.description,
       team: formData.team ? Number(formData.team) : null,
-      responsible: formData.responsible ? Number(formData.responsible) : 1,
+      responsible: formData.responsible ? Number(formData.responsible) : user?.id || null,
       category: formData.category ? Number(formData.category) : null,
+      status: formData.status,
+      priority: formData.priority,
+      due_date: formData.due_date || null,
     };
     onSubmit(data);
   };
@@ -100,8 +115,14 @@ export default function TaskForm({ task, onSubmit, onCancel }) {
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
         <label style={labelStyle}>
-          <span style={labelTextStyle}>Team</span>
-          <select name="team" value={formData.team} onChange={handleChange} style={inputStyle}>
+          <span style={labelTextStyle}>Team *</span>
+          <select
+            name="team"
+            value={formData.team}
+            onChange={handleChange}
+            style={inputStyle}
+            required={!task}
+          >
             <option value="">Select team...</option>
             {teams.map(team => (
               <option key={team.id} value={team.id}>{team.name}</option>

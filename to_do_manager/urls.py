@@ -10,6 +10,8 @@ from projects.views import (
     dashboard_create_task,
     dashboard_toggle_task,
     join_team,
+    team_detail,
+    team_send_message,
 )
 
 schema_view = get_schema_view(
@@ -35,6 +37,8 @@ urlpatterns = [
     path("dashboard/", dashboard_ui, name="dashboard-ui"),
     path("dashboard/create-task/", dashboard_create_task, name="dashboard-create-task"),
     path("dashboard/toggle/<int:task_id>/", dashboard_toggle_task, name="dashboard-toggle-task"),
+    path("dashboard/team/<int:team_id>/", team_detail, name="team-detail"),
+    path("dashboard/team/<int:team_id>/chat/", team_send_message, name="team-send-message"),
     path("join/<uuid:invite_code>/", join_team, name="join-team"),
 
     # SPA (React Router)

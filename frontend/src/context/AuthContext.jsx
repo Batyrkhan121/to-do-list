@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
       password,
       captcha_token: captchaToken,
     });
-    const { access, refresh, user: loggedInUser } = response.data;
+    const { access, refresh, user: loggedInUser, redirect_path: redirectPath, joined_team: joinedTeam } = response.data;
 
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
@@ -56,7 +56,11 @@ export function AuthProvider({ children }) {
     setUser(meResponse.data);
     setPermissions(meResponse.data.permissions || {});
 
-    return meResponse.data;
+    return {
+      ...meResponse.data,
+      redirect_path: redirectPath || null,
+      joined_team: joinedTeam || null,
+    };
   };
 
   const register = async (data) => {

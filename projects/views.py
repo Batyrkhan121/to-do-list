@@ -10,10 +10,14 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
-from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.core.exceptions import ObjectDoesNotExist
+from urllib.parse import urlencode
 from datetime import datetime
 
-from .models import Category, Team, Task, Project, CalendarEvent
+from .forms import TeamMessageForm
+from .invitations import store_invite_code
+from .models import Category, Team, Task, Project, CalendarEvent, TeamMessage
 from .serializers import (
     CategorySerializer,
     TeamListSerializer, TeamDetailSerializer,
@@ -38,6 +42,10 @@ def _team_invite_payload(team, user):
         "member_count": team.member_count,
         "is_member": is_member,
     }
+
+
+def _is_team_member(team, user):
+    return team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -196,7 +204,7 @@ class TaskViewSet(viewsets.ModelViewSet):
             return
 
         user = self.request.user
-        is_team_member = team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
+        is_team_member = _is_team_member(team, user)
         if not is_team_member and not user.is_superuser:
             raise PermissionDenied("You are not a member of this team.")
 
@@ -282,7 +290,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             raise ValidationError({"team": "Team is required."})
 
         user = self.request.user
-        is_team_member = team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
+        is_team_member = _is_team_member(team, user)
         if not is_team_member and not user.is_superuser:
             raise PermissionDenied("You are not a member of this team.")
 
@@ -443,6 +451,9 @@ def _dashboard_context(user):
         'personal_completed': personal_completed,
         'team_total': team_total,
         'team_completed': team_completed,
+        'personal_progress_percent': _safe_percent(personal_completed, personal_total),
+        'team_progress_percent': _safe_percent(team_completed, team_total),
+        # Backward-compatible aliases for templates/components still using old names.
         'personal_progress': _safe_percent(personal_completed, personal_total),
         'team_progress': _safe_percent(team_completed, team_total),
         'team_invites': user_teams,
@@ -512,11 +523,18 @@ def dashboard_toggle_task(request, task_id):
         task.completed_at = timezone.now()
 
     task.save(update_fields=['is_completed', 'status', 'completed_at', 'updated_at'])
+    next_url = (request.POST.get('next') or '').strip()
+    if next_url and url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return redirect(next_url)
     return redirect('dashboard-ui')
 
 
 def join_team(request, invite_code):
-    """Join a team by invite code and redirect user to the tasks page."""
+    """Join a team by invite code and preserve invite flow through auth."""
     team = get_object_or_404(
         Team.objects.select_related('team_lead'),
         invite_code=invite_code,
@@ -526,6 +544,92 @@ def join_team(request, invite_code):
     if request.user.is_authenticated:
         team.members.add(request.user)
         messages.success(request, f'You joined "{team.name}" successfully.')
+        return redirect('team-detail', team_id=team.id)
+
+    store_invite_code(request, str(invite_code))
+    next_path = f"/join/team/{team.id}?invite_code={team.invite_code}"
+    login_query = urlencode({'next': next_path})
+    messages.info(request, f'Login or register to join "{team.name}".')
+    return redirect(f"/login?{login_query}")
+
+
+@login_required
+def team_detail(request, team_id):
+    team = get_object_or_404(
+        Team.objects.select_related('team_lead'),
+        pk=team_id,
+        is_active=True,
+    )
+    if not _is_team_member(team, request.user):
+        messages.error(request, "You do not have access to this team.")
         return redirect('dashboard-ui')
 
-    return redirect(f"{reverse('admin:login')}?next={request.path}")
+    team_tasks = Task.objects.filter(team=team).select_related('responsible').order_by(
+        'is_completed',
+        'due_date',
+        '-created_at',
+    )
+    chat_messages = TeamMessage.objects.filter(team=team).select_related(
+        'author',
+        'author__profile',
+    )
+
+    members = list(
+        team.members.select_related('profile').order_by(
+            'username',
+        )
+    )
+    if all(member.id != team.team_lead_id for member in members):
+        members.insert(0, team.team_lead)
+
+    member_cards = []
+    for member in members:
+        try:
+            profile = member.profile
+            avatar_url = profile.avatar or ''
+        except ObjectDoesNotExist:
+            avatar_url = ''
+        full_name = member.get_full_name().strip()
+        member_cards.append({
+            'id': member.id,
+            'username': member.username,
+            'display_name': full_name or member.username,
+            'avatar_url': avatar_url,
+            'is_lead': member.id == team.team_lead_id,
+        })
+
+    context = {
+        'team': team,
+        'members': member_cards,
+        'team_tasks': team_tasks,
+        'team_total': team_tasks.count(),
+        'team_completed': team_tasks.filter(is_completed=True).count(),
+        'chat_messages': chat_messages,
+        'message_form': TeamMessageForm(),
+    }
+    return render(request, 'team_detail.html', context)
+
+
+@login_required
+@require_POST
+def team_send_message(request, team_id):
+    team = get_object_or_404(
+        Team.objects.select_related('team_lead'),
+        pk=team_id,
+        is_active=True,
+    )
+    if not _is_team_member(team, request.user):
+        messages.error(request, "You do not have access to this team.")
+        return redirect('dashboard-ui')
+
+    form = TeamMessageForm(request.POST)
+    if form.is_valid():
+        message = form.save(commit=False)
+        message.team = team
+        message.author = request.user
+        message.save()
+        messages.success(request, "Message sent.")
+    else:
+        messages.error(request, "Message cannot be empty.")
+
+    return redirect('team-detail', team_id=team.id)

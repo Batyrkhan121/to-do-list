@@ -6,6 +6,7 @@ const API_BASE_URL =
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -32,9 +33,13 @@ api.interceptors.response.use(
       try {
         const refresh = localStorage.getItem('refresh_token');
         if (refresh) {
-          const response = await axios.post(`${API_BASE_URL}/auth/refresh/`, {
-            refresh: refresh
-          });
+          const response = await axios.post(
+            `${API_BASE_URL}/auth/refresh/`,
+            {
+              refresh: refresh,
+            },
+            { withCredentials: true }
+          );
           
           const { access } = response.data;
           localStorage.setItem('access_token', access);

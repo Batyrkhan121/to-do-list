@@ -56,8 +56,8 @@ export default function Login() {
     setLoading(true);
 
     try {
-      await login(email, password, captchaToken);
-      navigate(nextPath);
+      const authResult = await login(email, password, captchaToken);
+      navigate(authResult?.redirect_path || nextPath);
     } catch (err) {
       const data = err.response?.data;
       const captchaError = data?.captcha;

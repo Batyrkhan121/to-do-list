@@ -5,6 +5,8 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth import login as django_login
+from django.contrib.auth import logout as django_logout
 from django.contrib.auth.tokens import default_token_generator
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
@@ -12,6 +14,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 
 import requests as http_requests
+from projects.invitations import join_user_from_session_invite
 
 from .serializers import (
     UserSerializer,
@@ -24,6 +27,16 @@ from .serializers import (
 )
 
 User = get_user_model()
+
+
+def _team_payload(team):
+    if team is None:
+        return None
+    return {
+        'id': team.id,
+        'name': team.name,
+        'invite_code': str(team.invite_code),
+    }
 
 
 @api_view(['POST'])
@@ -64,9 +77,11 @@ def register(request):
     serializer = RegisterSerializer(data=request.data)
     if serializer.is_valid():
         user = serializer.save()
+        joined_team = join_user_from_session_invite(request, user)
         return Response({
             'message': 'Registration successful',
-            'user': UserSerializer(user).data
+            'user': UserSerializer(user).data,
+            'joined_team': _team_payload(joined_team),
         }, status=status.HTTP_201_CREATED)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -120,13 +135,18 @@ def login(request):
         
         if not user.is_active:
             return Response({'error': 'Account is disabled'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        django_login(request, user, backend='django.contrib.auth.backends.ModelBackend')
+        joined_team = join_user_from_session_invite(request, user)
         
         refresh = RefreshToken.for_user(user)
         
         return Response({
             'access': str(refresh.access_token),
             'refresh': str(refresh),
-            'user': UserSerializer(user).data
+            'user': UserSerializer(user).data,
+            'joined_team': _team_payload(joined_team),
+            'redirect_path': f"/dashboard/team/{joined_team.id}/" if joined_team else None,
         })
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -142,6 +162,7 @@ def logout(request):
             token.blacklist()
     except Exception:
         pass
+    django_logout(request)
     return Response({'message': 'Logout successful'})
 
 

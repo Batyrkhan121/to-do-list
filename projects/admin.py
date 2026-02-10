@@ -1,7 +1,6 @@
 from django.contrib import admin
-from django.utils import timezone
 from django.utils.html import format_html
-from .models import Task, Project, Team, Category
+from .models import Task, Project, Team, Category, TeamMessage
 
 
 @admin.register(Category)
@@ -51,6 +50,19 @@ class TeamAdmin(admin.ModelAdmin):
     def member_count(self, obj):
         return obj.members.count()
     member_count.short_description = "Members"
+
+
+@admin.register(TeamMessage)
+class TeamMessageAdmin(admin.ModelAdmin):
+    list_display = ('team', 'author', 'short_content', 'created_at')
+    list_filter = ('team', 'created_at')
+    search_fields = ('content', 'author__username', 'team__name')
+
+    def short_content(self, obj):
+        if len(obj.content) <= 80:
+            return obj.content
+        return f"{obj.content[:77]}..."
+    short_content.short_description = "Message"
 
 
 admin.site.site_header = "📋 To Do Manager"

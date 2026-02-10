@@ -6,6 +6,12 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Count, Q
 from django.utils import timezone
+from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.urls import reverse
+from datetime import datetime
 
 from .models import Category, Team, Task, Project, CalendarEvent
 from .serializers import (
@@ -15,6 +21,23 @@ from .serializers import (
     ProjectListSerializer, ProjectDetailSerializer,
     CalendarEventSerializer,
 )
+
+def _team_invite_payload(team, user):
+    is_member = False
+    if user.is_authenticated:
+        is_member = (
+            team.team_lead_id == user.id or
+            team.members.filter(id=user.id).exists()
+        )
+    return {
+        "id": team.id,
+        "name": team.name,
+        "invite_code": str(team.invite_code),
+        "description": team.description,
+        "team_lead": team.team_lead.username,
+        "member_count": team.member_count,
+        "is_member": is_member,
+    }
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -36,9 +59,7 @@ class TeamViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        return self.queryset.filter(
-            Q(team_lead=user) | Q(members=user)
-        ).distinct()
+        return self.queryset.filter(members=user).distinct()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -74,27 +95,58 @@ class TeamViewSet(viewsets.ModelViewSet):
         serializer = ProjectListSerializer(projects, many=True)
         return Response(serializer.data)
 
-    @action(detail=True, methods=['get'])
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def invite(self, request, pk=None):
         try:
             team = Team.objects.select_related('team_lead').get(pk=pk, is_active=True)
         except Team.DoesNotExist:
             return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        is_member = team.team_lead_id == request.user.id or team.members.filter(id=request.user.id).exists()
-        return Response({
-            "id": team.id,
-            "name": team.name,
-            "description": team.description,
-            "team_lead": team.team_lead.username,
-            "member_count": team.member_count,
-            "is_member": is_member,
-        })
+        return Response(_team_invite_payload(team, request.user))
+
+    @action(
+        detail=False,
+        methods=['get'],
+        permission_classes=[AllowAny],
+        url_path=r'invite-by-code/(?P<invite_code>[0-9a-fA-F-]{36})'
+    )
+    def invite_by_code(self, request, invite_code=None):
+        try:
+            team = Team.objects.select_related('team_lead').get(invite_code=invite_code, is_active=True)
+        except Team.DoesNotExist:
+            return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+        return Response(_team_invite_payload(team, request.user))
 
     @action(detail=True, methods=['post'])
     def join(self, request, pk=None):
         try:
             team = Team.objects.select_related('team_lead').get(pk=pk, is_active=True)
+        except Team.DoesNotExist:
+            return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        if team.team_lead_id == request.user.id or team.members.filter(id=request.user.id).exists():
+            return Response({
+                "detail": "You are already a team member",
+                "team_id": team.id,
+                "team_name": team.name,
+            })
+
+        team.members.add(request.user)
+        return Response({
+            "detail": "Joined team successfully",
+            "team_id": team.id,
+            "team_name": team.name,
+        }, status=status.HTTP_200_OK)
+
+    @action(
+        detail=False,
+        methods=['post'],
+        permission_classes=[IsAuthenticated],
+        url_path=r'join-by-code/(?P<invite_code>[0-9a-fA-F-]{36})'
+    )
+    def join_by_code(self, request, invite_code=None):
+        try:
+            team = Team.objects.select_related('team_lead').get(invite_code=invite_code, is_active=True)
         except Team.DoesNotExist:
             return Response({"detail": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
 
@@ -124,7 +176,8 @@ class TaskViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return self.queryset.filter(
-            Q(team__team_lead=user) | Q(team__members=user)
+            Q(team__in=user.teams.all()) |
+            Q(team__isnull=True, responsible=user)
         ).distinct()
 
     def get_serializer_class(self):
@@ -136,7 +189,11 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def _validate_team_access(self, team, responsible):
         if team is None:
-            raise ValidationError({"team": "Team is required."})
+            if responsible and responsible.id != self.request.user.id and not self.request.user.is_superuser:
+                raise ValidationError({
+                    "responsible": "Personal task can only be assigned to yourself."
+                })
+            return
 
         user = self.request.user
         is_team_member = team.team_lead_id == user.id or team.members.filter(id=user.id).exists()
@@ -157,6 +214,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         team = serializer.validated_data.get('team')
         responsible = serializer.validated_data.get('responsible')
         self._validate_team_access(team, responsible)
+        if team is None and responsible is None:
+            serializer.save(responsible=self.request.user)
+            return
         serializer.save()
 
     def perform_update(self, serializer):
@@ -209,7 +269,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return self.queryset.filter(
-            Q(team__team_lead=user) | Q(team__members=user)
+            team__in=user.teams.all()
         ).distinct()
 
     def get_serializer_class(self):
@@ -281,11 +341,11 @@ class CalendarEventViewSet(viewsets.ModelViewSet):
 def dashboard_stats(request):
     today = timezone.now().date()
 
-    user_teams = Team.objects.filter(
-        Q(team_lead=request.user) | Q(members=request.user)
-    ).distinct()
+    user_teams = request.user.teams.filter(is_active=True).distinct()
 
-    visible_tasks = Task.objects.filter(team__in=user_teams).distinct()
+    visible_tasks = Task.objects.filter(
+        Q(responsible=request.user) | Q(team__in=user_teams)
+    ).distinct()
     visible_projects = Project.objects.filter(team__in=user_teams).distinct()
 
     total_tasks = visible_tasks.count()
@@ -325,3 +385,147 @@ def dashboard_stats(request):
     }
     
     return Response(data)
+
+
+def _safe_percent(completed, total):
+    if total == 0:
+        return 0
+    return int((completed / total) * 100)
+
+
+def _dashboard_context(user):
+    user_teams = user.teams.filter(is_active=True).order_by('name')
+    visible_tasks = Task.objects.filter(
+        Q(responsible=user) | Q(team__in=user_teams)
+    ).distinct()
+
+    personal_tasks = visible_tasks.filter(
+        team__isnull=True,
+        responsible=user,
+    ).order_by('is_completed', 'due_date', '-created_at')
+
+    team_tasks = visible_tasks.filter(
+        team__in=user_teams,
+    ).select_related('team').order_by('is_completed', 'due_date', '-created_at').distinct()
+
+    stats = visible_tasks.aggregate(
+        personal_total=Count(
+            'id',
+            filter=Q(team__isnull=True, responsible=user),
+            distinct=True,
+        ),
+        personal_completed=Count(
+            'id',
+            filter=Q(team__isnull=True, responsible=user, is_completed=True),
+            distinct=True,
+        ),
+        team_total=Count(
+            'id',
+            filter=Q(team__in=user_teams),
+            distinct=True,
+        ),
+        team_completed=Count(
+            'id',
+            filter=Q(team__in=user_teams, is_completed=True),
+            distinct=True,
+        ),
+    )
+
+    personal_total = stats['personal_total'] or 0
+    personal_completed = stats['personal_completed'] or 0
+    team_total = stats['team_total'] or 0
+    team_completed = stats['team_completed'] or 0
+
+    return {
+        'personal_tasks': personal_tasks,
+        'team_tasks': team_tasks,
+        'personal_total': personal_total,
+        'personal_completed': personal_completed,
+        'team_total': team_total,
+        'team_completed': team_completed,
+        'personal_progress': _safe_percent(personal_completed, personal_total),
+        'team_progress': _safe_percent(team_completed, team_total),
+        'team_invites': user_teams,
+    }
+
+
+@login_required
+def dashboard_ui(request):
+    context = _dashboard_context(request.user)
+    return render(request, 'dashboard.html', context)
+
+
+@login_required
+@require_POST
+def dashboard_create_task(request):
+    title = (request.POST.get('title') or '').strip()
+    description = (request.POST.get('description') or '').strip()
+    due_date_raw = (request.POST.get('due_date') or '').strip()
+    team_id = (request.POST.get('team_id') or '').strip()
+
+    if not title:
+        messages.error(request, 'Task title is required.')
+        return redirect('dashboard-ui')
+
+    selected_team = None
+    if team_id:
+        selected_team = request.user.teams.filter(id=team_id, is_active=True).first()
+        if selected_team is None:
+            messages.error(request, 'You can only create team tasks inside your teams.')
+            return redirect('dashboard-ui')
+
+    task_data = {
+        'title': title,
+        'description': description,
+        'responsible': request.user,
+        'team': selected_team,
+    }
+
+    if due_date_raw:
+        try:
+            task_data['due_date'] = datetime.strptime(due_date_raw, '%Y-%m-%d').date()
+        except ValueError:
+            messages.error(request, 'Invalid date format.')
+            return redirect('dashboard-ui')
+
+    Task.objects.create(**task_data)
+    messages.success(request, 'Task created successfully.')
+    return redirect('dashboard-ui')
+
+
+@login_required
+@require_POST
+def dashboard_toggle_task(request, task_id):
+    user_teams = request.user.teams.filter(is_active=True)
+    task = get_object_or_404(
+        Task.objects.filter(Q(responsible=request.user) | Q(team__in=user_teams)).distinct(),
+        pk=task_id,
+    )
+
+    if task.is_completed:
+        task.is_completed = False
+        task.status = 'todo'
+        task.completed_at = None
+    else:
+        task.is_completed = True
+        task.status = 'done'
+        task.completed_at = timezone.now()
+
+    task.save(update_fields=['is_completed', 'status', 'completed_at', 'updated_at'])
+    return redirect('dashboard-ui')
+
+
+def join_team(request, invite_code):
+    """Join a team by invite code and redirect user to the tasks page."""
+    team = get_object_or_404(
+        Team.objects.select_related('team_lead'),
+        invite_code=invite_code,
+        is_active=True,
+    )
+
+    if request.user.is_authenticated:
+        team.members.add(request.user)
+        messages.success(request, f'You joined "{team.name}" successfully.')
+        return redirect('dashboard-ui')
+
+    return redirect(f"{reverse('admin:login')}?next={request.path}")

@@ -14,7 +14,7 @@ const api = axios.create({
 // Добавляем токен к каждому запросу
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
-  if (token) {
+  if (token && !config.skipAuth) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -24,9 +24,9 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
     
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest._retry && !originalRequest.skipAuth) {
       originalRequest._retry = true;
       
       try {
@@ -83,8 +83,10 @@ export const teamsApi = {
   create: (data) => api.post('/v1/teams/', data),
   update: (id, data) => api.patch(`/v1/teams/${id}/`, data),
   delete: (id) => api.delete(`/v1/teams/${id}/`),
-  getInviteInfo: (id) => api.get(`/v1/teams/${id}/invite/`),
+  getInviteInfo: (id) => api.get(`/v1/teams/${id}/invite/`, { skipAuth: true }),
+  getInviteInfoByCode: (inviteCode) => api.get(`/v1/teams/invite-by-code/${inviteCode}/`, { skipAuth: true }),
   join: (id) => api.post(`/v1/teams/${id}/join/`),
+  joinByCode: (inviteCode) => api.post(`/v1/teams/join-by-code/${inviteCode}/`),
 };
 
 // Categories API

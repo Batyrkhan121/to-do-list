@@ -210,6 +210,14 @@ export const useTeamInviteInfo = (id) => {
   });
 };
 
+export const useTeamInviteInfoByCode = (inviteCode) => {
+  return useQuery({
+    queryKey: ['team-invite-code', inviteCode],
+    queryFn: () => teamsApi.getInviteInfoByCode(inviteCode).then(res => res.data),
+    enabled: !!inviteCode,
+  });
+};
+
 export const useJoinTeam = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -220,6 +228,22 @@ export const useJoinTeam = () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['team-invite'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+    },
+  });
+};
+
+export const useJoinTeamByCode = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (inviteCode) => teamsApi.joinByCode(inviteCode).then(res => res.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teams'] });
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['team-invite'] });
+      queryClient.invalidateQueries({ queryKey: ['team-invite-code'] });
       queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
     },
   });

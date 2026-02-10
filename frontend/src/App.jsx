@@ -96,6 +96,8 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
       <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/reset-password/:uidb64/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+      <Route path="/join/:inviteCode" element={<JoinTeam />} />
+      <Route path="/join/:inviteCode/" element={<JoinTeam />} />
       <Route path="/join/team/:teamId" element={<JoinTeam />} />
 
       {/* Protected routes */}

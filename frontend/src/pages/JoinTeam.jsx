@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useJoinTeam, useTeamInviteInfo } from '../hooks/useApi';
+import { useJoinTeam, useJoinTeamByCode, useTeamInviteInfo, useTeamInviteInfoByCode } from '../hooks/useApi';
 
 export default function JoinTeam() {
-  const { teamId } = useParams();
+  const { teamId, inviteCode } = useParams();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
+  const identifier = inviteCode || teamId;
+  const isCodeMode = Boolean(inviteCode);
 
   const [localMessage, setLocalMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
@@ -16,21 +18,19 @@ export default function JoinTeam() {
   const [autoJoinAttempted, setAutoJoinAttempted] = useState(false);
 
   const joinTeam = useJoinTeam();
-  const inviteTeamId = isAuthenticated ? teamId : null;
-  const { data: inviteInfo, isLoading: inviteLoading, error: inviteError } = useTeamInviteInfo(inviteTeamId);
+  const joinTeamByCode = useJoinTeamByCode();
+  const inviteById = useTeamInviteInfo(teamId);
+  const inviteByCode = useTeamInviteInfoByCode(inviteCode);
+  const inviteDataSource = isCodeMode ? inviteByCode : inviteById;
+  const inviteInfo = inviteDataSource.data;
+  const inviteLoading = inviteDataSource.isLoading;
+  const inviteError = inviteDataSource.error;
 
   const teamNameFromQuery = searchParams.get('name');
   const teamName = useMemo(
-    () => inviteInfo?.name || teamNameFromQuery || `Team #${teamId}`,
-    [inviteInfo?.name, teamNameFromQuery, teamId]
+    () => inviteInfo?.name || teamNameFromQuery || `Team #${identifier || 'unknown'}`,
+    [inviteInfo?.name, teamNameFromQuery, identifier]
   );
-
-  useEffect(() => {
-    if (!loading && !isAuthenticated) {
-      const next = encodeURIComponent(`${location.pathname}${location.search}`);
-      navigate(`/login?next=${next}`, { replace: true });
-    }
-  }, [isAuthenticated, loading, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!joined) return;
@@ -55,10 +55,18 @@ export default function JoinTeam() {
   };
 
   const handleJoin = async () => {
+    if (!isAuthenticated) {
+      const next = encodeURIComponent(`${location.pathname}${location.search}`);
+      navigate(`/login?next=${next}`, { replace: true });
+      return;
+    }
+
     setLocalMessage('');
     setMessageType('info');
     try {
-      const result = await joinTeam.mutateAsync(teamId);
+      const result = isCodeMode
+        ? await joinTeamByCode.mutateAsync(inviteCode)
+        : await joinTeam.mutateAsync(teamId);
       setJoined(true);
       setMessageType('success');
       setLocalMessage(result?.detail || 'You have joined this team.');
@@ -70,7 +78,8 @@ export default function JoinTeam() {
 
   useEffect(() => {
     if (loading || !isAuthenticated) return;
-    if (!inviteInfo || inviteInfo.is_member || joined || autoJoinAttempted) return;
+    if (inviteLoading || joined || autoJoinAttempted) return;
+    if (inviteInfo?.is_member) return;
 
     setAutoJoinAttempted(true);
 
@@ -78,7 +87,9 @@ export default function JoinTeam() {
       setLocalMessage('');
       setMessageType('info');
       try {
-        const result = await joinTeam.mutateAsync(teamId);
+        const result = isCodeMode
+          ? await joinTeamByCode.mutateAsync(inviteCode)
+          : await joinTeam.mutateAsync(teamId);
         setJoined(true);
         setMessageType('success');
         setLocalMessage(result?.detail || 'You have joined this team.');
@@ -92,14 +103,18 @@ export default function JoinTeam() {
   }, [
     loading,
     isAuthenticated,
+    inviteLoading,
     inviteInfo,
     joined,
     autoJoinAttempted,
     joinTeam,
+    joinTeamByCode,
+    isCodeMode,
+    inviteCode,
     teamId,
   ]);
 
-  if (loading || !isAuthenticated) {
+  if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}>
         <div className="spinner"></div>
@@ -173,9 +188,11 @@ export default function JoinTeam() {
               type="button"
               className="btn btn-primary"
               onClick={handleJoin}
-              disabled={joinTeam.isPending}
+              disabled={joinTeam.isPending || joinTeamByCode.isPending}
             >
-              {joinTeam.isPending ? 'Joining...' : 'Join Team'}
+              {isAuthenticated
+                ? (joinTeam.isPending || joinTeamByCode.isPending ? 'Joining...' : 'Join Team')
+                : 'Login to Join Team'}
             </button>
           )}
 

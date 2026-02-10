@@ -44,7 +44,11 @@ export default function Teams() {
   };
 
   const copyInviteLink = (team) => {
-    const inviteLink = `${window.location.origin}/join/team/${team.id}?name=${encodeURIComponent(team.name)}`;
+    if (!team.invite_code) {
+      alert('Invite code is not available for this team yet. Refresh the page.');
+      return;
+    }
+    const inviteLink = `${window.location.origin}/join/${team.invite_code}/`;
     navigator.clipboard.writeText(inviteLink);
     setCopiedId(team.id);
     setTimeout(() => setCopiedId(null), 2000);
@@ -151,6 +155,17 @@ export default function Teams() {
                       No members yet
                     </p>
                   )}
+                </div>
+
+                <div style={{ marginTop: '10px' }}>
+                  <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                    Invite link
+                  </p>
+                  <p style={{ margin: 0, fontSize: '12px', color: '#334155', wordBreak: 'break-all' }}>
+                    {team.invite_code
+                      ? `${window.location.origin}/join/${team.invite_code}/`
+                      : 'Generating...'}
+                  </p>
                 </div>
 
                 {/* Invite link button */}

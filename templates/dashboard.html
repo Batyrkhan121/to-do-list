@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Django ToDoList Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          boxShadow: {
+            soft: '0 10px 30px rgba(15, 23, 42, 0.08)',
+          },
+        },
+      },
+    };
+  </script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900">
+  <div class="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+    <header class="mb-6 flex flex-col gap-4 rounded-xl bg-white p-5 shadow-soft sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight">ToDo Dashboard</h1>
+        <p class="mt-1 text-sm text-slate-500">Personal and team tasks in one place.</p>
+      </div>
+      <div class="text-sm text-slate-500">
+        Signed in as <span class="font-semibold text-slate-700">{{ request.user.username }}</span>
+      </div>
+    </header>
+
+    {% if messages %}
+      <div class="mb-6 space-y-2">
+        {% for message in messages %}
+          <div class="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm shadow-soft">
+            {{ message }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    <section class="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div class="rounded-xl bg-white p-5 shadow-soft">
+        <div class="mb-2 flex items-center justify-between">
+          <p class="text-sm font-medium text-slate-600">Personal Progress</p>
+          <span class="text-sm font-semibold text-blue-600">{{ personal_progress }}%</span>
+        </div>
+        <div class="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            class="progress-bar h-3 rounded-full bg-blue-500 transition-all duration-700 ease-out"
+            data-target="{{ personal_progress }}"
+            style="width: 0%"
+          ></div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">{{ personal_completed }} / {{ personal_total }} completed</p>
+      </div>
+
+      <div class="rounded-xl bg-white p-5 shadow-soft">
+        <div class="mb-2 flex items-center justify-between">
+          <p class="text-sm font-medium text-slate-600">Team Progress</p>
+          <span class="text-sm font-semibold text-violet-600">{{ team_progress }}%</span>
+        </div>
+        <div class="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+          <div
+            class="progress-bar h-3 rounded-full bg-violet-500 transition-all duration-700 ease-out"
+            data-target="{{ team_progress }}"
+            style="width: 0%"
+          ></div>
+        </div>
+        <p class="mt-2 text-xs text-slate-500">{{ team_completed }} / {{ team_total }} completed</p>
+      </div>
+    </section>
+
+    <section class="mb-6 rounded-xl bg-white p-5 shadow-soft">
+      <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 class="text-lg font-semibold">Quick Add Task</h2>
+        <button
+          id="openInviteModal"
+          type="button"
+          class="inline-flex items-center justify-center rounded-xl bg-violet-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-violet-700"
+        >
+          Invite to Team
+        </button>
+      </div>
+
+      <form method="post" action="{% url 'dashboard-create-task' %}" class="grid grid-cols-1 gap-3 md:grid-cols-4">
+        {% csrf_token %}
+        <input
+          type="text"
+          name="title"
+          placeholder="Task title"
+          required
+          class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        >
+        <input
+          type="date"
+          name="due_date"
+          class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        >
+        <select
+          name="team_id"
+          class="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+        >
+          <option value="">Personal task</option>
+          {% for team in team_invites %}
+            <option value="{{ team.id }}">{{ team.name }}</option>
+          {% endfor %}
+        </select>
+        <button
+          type="submit"
+          class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+        >
+          Create
+        </button>
+      </form>
+    </section>
+
+    <section class="rounded-xl bg-white p-5 shadow-soft">
+      <div class="mb-4 flex gap-2 rounded-xl bg-slate-100 p-1">
+        <button
+          type="button"
+          data-tab="personal"
+          class="tab-button flex-1 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition"
+        >
+          My Tasks
+        </button>
+        <button
+          type="button"
+          data-tab="team"
+          class="tab-button flex-1 rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition"
+        >
+          Team Tasks
+        </button>
+      </div>
+
+      <div id="tab-personal" class="tab-panel space-y-3">
+        {% for task in personal_tasks %}
+          <article class="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
+            <form method="post" action="{% url 'dashboard-toggle-task' task.id %}" class="pt-1">
+              {% csrf_token %}
+              <button
+                type="submit"
+                class="h-5 w-5 rounded-md border border-slate-300 text-xs {% if task.is_completed %}bg-blue-500 text-white{% else %}bg-white text-transparent{% endif %}"
+                title="Toggle complete"
+              >
+                ✓
+              </button>
+            </form>
+            <div class="min-w-0 flex-1">
+              <div class="mb-1 flex flex-wrap items-center gap-2">
+                <h3 class="truncate text-sm font-semibold {% if task.is_completed %}text-slate-400 line-through{% endif %}">
+                  {{ task.title }}
+                </h3>
+                <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">Personal</span>
+              </div>
+              {% if task.description %}
+                <p class="mb-1 text-sm text-slate-500">{{ task.description }}</p>
+              {% endif %}
+              <p class="text-xs text-slate-400">
+                {% if task.due_date %}Due: {{ task.due_date }}{% else %}No due date{% endif %}
+              </p>
+            </div>
+          </article>
+        {% empty %}
+          <div class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            No personal tasks yet.
+          </div>
+        {% endfor %}
+      </div>
+
+      <div id="tab-team" class="tab-panel hidden space-y-3">
+        {% for task in team_tasks %}
+          <article class="flex items-start gap-3 rounded-xl border border-slate-200 p-4">
+            <form method="post" action="{% url 'dashboard-toggle-task' task.id %}" class="pt-1">
+              {% csrf_token %}
+              <button
+                type="submit"
+                class="h-5 w-5 rounded-md border border-slate-300 text-xs {% if task.is_completed %}bg-violet-500 text-white{% else %}bg-white text-transparent{% endif %}"
+                title="Toggle complete"
+              >
+                ✓
+              </button>
+            </form>
+            <div class="min-w-0 flex-1">
+              <div class="mb-1 flex flex-wrap items-center gap-2">
+                <h3 class="truncate text-sm font-semibold {% if task.is_completed %}text-slate-400 line-through{% endif %}">
+                  {{ task.title }}
+                </h3>
+                <span class="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                  Team: {{ task.team.name }}
+                </span>
+              </div>
+              {% if task.description %}
+                <p class="mb-1 text-sm text-slate-500">{{ task.description }}</p>
+              {% endif %}
+              <p class="text-xs text-slate-400">
+                Assignee: {{ task.responsible.username }}{% if task.due_date %} • Due: {{ task.due_date }}{% endif %}
+              </p>
+            </div>
+          </article>
+        {% empty %}
+          <div class="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            No team tasks yet.
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <div id="inviteModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 p-4">
+    <div class="w-full max-w-lg rounded-xl bg-white p-5 shadow-soft">
+      <div class="mb-3 flex items-center justify-between">
+        <h3 class="text-lg font-semibold">Invite to Team</h3>
+        <button id="closeInviteModal" type="button" class="rounded-lg px-2 py-1 text-slate-500 hover:bg-slate-100">✕</button>
+      </div>
+      <p class="mb-4 text-sm text-slate-500">Copy invitation link and share it with your teammate.</p>
+      <div class="space-y-3">
+        {% for team in team_invites %}
+          <div class="rounded-xl border border-slate-200 p-3">
+            <p class="mb-2 text-sm font-medium">{{ team.name }}</p>
+            <div class="flex flex-col gap-2 sm:flex-row">
+              <input
+                type="text"
+                readonly
+                value="{{ request.scheme }}://{{ request.get_host }}{% url 'join-team' team.invite_code %}"
+                class="w-full rounded-lg border border-slate-200 px-2 py-1 text-xs text-slate-600"
+              >
+              <button
+                type="button"
+                class="copy-link rounded-lg bg-violet-600 px-3 py-1 text-xs font-medium text-white hover:bg-violet-700"
+                data-link="{{ request.scheme }}://{{ request.get_host }}{% url 'join-team' team.invite_code %}"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+        {% empty %}
+          <p class="text-sm text-slate-500">Create a team first to generate invite links.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.querySelectorAll('.progress-bar').forEach((bar) => {
+      requestAnimationFrame(() => {
+        bar.style.width = `${bar.dataset.target || 0}%`;
+      });
+    });
+
+    const tabButtons = document.querySelectorAll('.tab-button');
+    const tabPanels = {
+      personal: document.getElementById('tab-personal'),
+      team: document.getElementById('tab-team'),
+    };
+
+    function activateTab(name) {
+      tabButtons.forEach((button) => {
+        const active = button.dataset.tab === name;
+        button.classList.toggle('bg-white', active);
+        button.classList.toggle('shadow', active);
+        button.classList.toggle('text-slate-900', active);
+      });
+      Object.entries(tabPanels).forEach(([key, panel]) => {
+        panel.classList.toggle('hidden', key !== name);
+      });
+    }
+
+    tabButtons.forEach((button) => {
+      button.addEventListener('click', () => activateTab(button.dataset.tab));
+    });
+    activateTab('personal');
+
+    const inviteModal = document.getElementById('inviteModal');
+    const openInviteModal = document.getElementById('openInviteModal');
+    const closeInviteModal = document.getElementById('closeInviteModal');
+
+    if (openInviteModal && inviteModal) {
+      openInviteModal.addEventListener('click', () => {
+        inviteModal.classList.remove('hidden');
+        inviteModal.classList.add('flex');
+      });
+    }
+
+    if (closeInviteModal && inviteModal) {
+      closeInviteModal.addEventListener('click', () => {
+        inviteModal.classList.remove('flex');
+        inviteModal.classList.add('hidden');
+      });
+    }
+
+    document.querySelectorAll('.copy-link').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const link = button.dataset.link || '';
+        if (!link) return;
+        try {
+          await navigator.clipboard.writeText(link);
+          button.textContent = 'Copied';
+          setTimeout(() => { button.textContent = 'Copy'; }, 1200);
+        } catch (e) {
+          window.prompt('Copy this link', link);
+        }
+      });
+    });
+  </script>
+</body>
+</html>

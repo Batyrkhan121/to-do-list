@@ -1,6 +1,7 @@
 from django.conf import settings 
 from django.db import models 
 from django.utils import timezone
+import uuid
 
 
 class Category(models.Model):
@@ -25,6 +26,7 @@ class Team(models.Model):
         related_name='led_teams'
     )
     name = models.CharField(max_length=200)
+    invite_code = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     description = models.TextField(blank=True)
     members = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
@@ -65,7 +67,9 @@ class Task(models.Model):
     
     team = models.ForeignKey(
         Team, 
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='tasks'
     )
     responsible = models.ForeignKey(

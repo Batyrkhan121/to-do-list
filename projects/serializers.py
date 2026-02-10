@@ -31,7 +31,7 @@ class TeamListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Team
-        fields = ['id', 'name', 'team_lead', 'members', 'member_count', 'is_active', 'created_at']
+        fields = ['id', 'name', 'invite_code', 'team_lead', 'members', 'member_count', 'is_active', 'created_at']
 
 
 class TeamDetailSerializer(serializers.ModelSerializer):
@@ -55,10 +55,10 @@ class TeamDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
         fields = [
-            'id', 'name', 'description', 'team_lead', 'team_lead_id',
+            'id', 'name', 'invite_code', 'description', 'team_lead', 'team_lead_id',
             'members', 'member_ids', 'member_count', 'is_active', 'created_at'
         ]
-        read_only_fields = ['id', 'created_at']
+        read_only_fields = ['id', 'invite_code', 'created_at']
 
 
 class TaskListSerializer(serializers.ModelSerializer):

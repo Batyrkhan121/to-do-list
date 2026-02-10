@@ -31,6 +31,7 @@ import {
   useTasks,
   useUpdateCalendarEvent,
 } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 const localizer = dateFnsLocalizer({
   format,
   parse,
@@ -123,11 +124,17 @@ function EventCell({ event }) {
   );
 }
 export default function CalendarPage() {
-  const { data: tasksData, isLoading, error } = useTasks({});
+  const { user } = useAuth();
+  const syncOptions = {
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  };
+
+  const { data: tasksData, isLoading, error } = useTasks({}, syncOptions);
   const {
     data: calendarEventsData,
     isLoading: isEventsLoading,
-  } = useCalendarEvents();
+  } = useCalendarEvents({}, syncOptions);
   const completeTask = useCompleteTask();
   const createCalendarEvent = useCreateCalendarEvent();
   const updateCalendarEvent = useUpdateCalendarEvent();
@@ -215,9 +222,10 @@ export default function CalendarPage() {
         const start = parseTaskDate(task.due_date);
         if (!start) return null;
         const end = new Date(start.getTime() + 30 * 60 * 1000);
+        const isOwnTask = task.responsible?.id === user?.id;
         return {
           id: `task-${task.id}`,
-          title: task.title,
+          title: isOwnTask ? task.title : `Team: ${task.title}`,
           start,
           end,
           calendarId: 'my',
@@ -226,13 +234,14 @@ export default function CalendarPage() {
           taskId: task.id,
           description: task.description,
           isCompleted: task.is_completed,
+          isOwnTask,
           isRecurring: false,
           participants: task.responsible?.username ? [task.responsible.username] : [],
           location: task.team_name || '',
         };
       })
       .filter(Boolean);
-  }, [tasks]);
+  }, [tasks, user?.id]);
 
   const holidayEvents = useMemo(() => {
     const base = startOfMonth(date);
@@ -1024,6 +1033,11 @@ const createDefaultForm = (baseDate = new Date(), calendarId = 'my') => {
             )}
             {selectedEvent.description && (
               <div style={{ fontSize: '14px' }}>{selectedEvent.description}</div>
+            )}
+            {selectedEvent.source === 'task' && (
+              <div style={{ fontSize: '14px' }}>
+                Task type: {selectedEvent.isOwnTask ? 'My task' : 'Team task'}
+              </div>
             )}
             {Array.isArray(selectedEvent.participants) && selectedEvent.participants.length > 0 && (
               <div style={{ fontSize: '14px' }}>

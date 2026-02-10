@@ -1,4 +1,4 @@
-export default function TaskCard({ task, onComplete, onEdit }) {
+export default function TaskCard({ task, onComplete, onEdit, isOwnTask = true }) {
   const priorityColors = {
     low: { bg: '#f0fdf4', text: '#16a34a' },
     medium: { bg: '#fefce8', text: '#ca8a04' },
@@ -15,6 +15,12 @@ export default function TaskCard({ task, onComplete, onEdit }) {
 
   const priority = priorityColors[task.priority] || priorityColors.medium;
   const status = statusColors[task.status] || statusColors.todo;
+  const ownershipBadge = isOwnTask
+    ? { label: 'My task', bg: '#dbeafe', text: '#1d4ed8' }
+    : { label: 'Team task', bg: '#ede9fe', text: '#6d28d9' };
+  const ownershipSurface = isOwnTask
+    ? { border: '#93c5fd', bg: '#f8fbff' }
+    : { border: '#c4b5fd', bg: '#fbf8ff' };
 
   return (
     <div 
@@ -23,7 +29,9 @@ export default function TaskCard({ task, onComplete, onEdit }) {
       style={{ 
         padding: '16px', 
         cursor: 'pointer',
-        opacity: task.is_completed ? 0.6 : 1
+        opacity: task.is_completed ? 0.6 : 1,
+        borderLeft: `4px solid ${ownershipSurface.border}`,
+        background: ownershipSurface.bg,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -64,6 +72,9 @@ export default function TaskCard({ task, onComplete, onEdit }) {
 
           {/* Badges */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '10px' }}>
+            <span className="badge" style={{ backgroundColor: ownershipBadge.bg, color: ownershipBadge.text }}>
+              {ownershipBadge.label}
+            </span>
             <span className="badge" style={{ backgroundColor: priority.bg, color: priority.text }}>
               {task.priority}
             </span>
@@ -79,6 +90,9 @@ export default function TaskCard({ task, onComplete, onEdit }) {
             )}
             {task.responsible?.username && (
               <span>Assignee: {task.responsible.username}</span>
+            )}
+            {task.team_name && (
+              <span>Team: {task.team_name}</span>
             )}
           </div>
         </div>

@@ -32,6 +32,15 @@ export default function JoinTeam() {
     }
   }, [isAuthenticated, loading, location.pathname, location.search, navigate]);
 
+  useEffect(() => {
+    if (!joined) return;
+    const timeoutId = setTimeout(() => {
+      navigate('/tasks', { replace: true });
+    }, 1400);
+
+    return () => clearTimeout(timeoutId);
+  }, [joined, navigate]);
+
   const getApiError = (error) => {
     const data = error?.response?.data;
     if (!data) return error.message || 'Failed to join the team';

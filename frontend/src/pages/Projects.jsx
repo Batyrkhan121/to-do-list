@@ -20,8 +20,13 @@ export default function Projects() {
   const [teamId, setTeamId] = useState('');
   const [deadline, setDeadline] = useState('');
 
-  const { data: projectsData, isLoading } = useProjects();
-  const { data: tasksData } = useTasks({});
+  const syncOptions = {
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  };
+
+  const { data: projectsData, isLoading } = useProjects({}, syncOptions);
+  const { data: tasksData } = useTasks({}, syncOptions);
   const { data: teamsData } = useTeams();
   
   const createProject = useCreateProject();

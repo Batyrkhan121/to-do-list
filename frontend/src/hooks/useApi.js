@@ -2,18 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { tasksApi, projectsApi, teamsApi, categoriesApi, dashboardApi, calendarEventsApi } from '../services/api';
 
 // Dashboard
-export const useDashboard = () => {
+export const useDashboard = (options = {}) => {
   return useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboardApi.getStats().then(res => res.data),
+    ...options,
   });
 };
 
 // ============ TASKS ============
-export const useTasks = (params) => {
+export const useTasks = (params = {}, options = {}) => {
   return useQuery({
     queryKey: ['tasks', params],
     queryFn: () => tasksApi.getAll(params).then(res => res.data),
+    ...options,
   });
 };
 
@@ -78,18 +80,20 @@ export const useDeleteTask = () => {
 };
 
 // ============ PROJECTS ============
-export const useProjects = (params) => {
+export const useProjects = (params = {}, options = {}) => {
   return useQuery({
     queryKey: ['projects', params],
     queryFn: () => projectsApi.getAll(params).then(res => res.data),
+    ...options,
   });
 };
 
-export const useProject = (id) => {
+export const useProject = (id, options = {}) => {
   return useQuery({
     queryKey: ['project', id],
     queryFn: () => projectsApi.getById(id).then(res => res.data),
     enabled: !!id,
+    ...options,
   });
 };
 
@@ -215,6 +219,8 @@ export const useJoinTeam = () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['team-invite'] });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
     },
   });
 };
@@ -248,10 +254,11 @@ export const useDeleteCategory = () => {
 };
 
 // ============ CALENDAR EVENTS ============
-export const useCalendarEvents = (params) => {
+export const useCalendarEvents = (params = {}, options = {}) => {
   return useQuery({
     queryKey: ['calendar-events', params],
     queryFn: () => calendarEventsApi.getAll(params).then(res => res.data),
+    ...options,
   });
 };
 

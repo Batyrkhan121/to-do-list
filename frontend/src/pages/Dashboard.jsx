@@ -4,9 +4,14 @@ import StatCard from '../components/StatCard';
 import TaskCard from '../components/TaskCard';
 import { PageTransition, CardAnimation, Skeleton } from '../components/animations/PageTransition';
 import { useDashboard, useCompleteTask } from '../hooks/useApi';
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
-  const { data: stats, isLoading, error } = useDashboard();
+  const { user } = useAuth();
+  const { data: stats, isLoading, error } = useDashboard({
+    refetchInterval: 5000,
+    refetchIntervalInBackground: true,
+  });
   const completeTask = useCompleteTask();
 
   if (isLoading) {
@@ -222,6 +227,7 @@ export default function Dashboard() {
                   >
                     <TaskCard 
                       task={task} 
+                      isOwnTask={task.responsible?.id === user?.id}
                       onComplete={(id) => completeTask.mutate(id)}
                     />
                   </motion.div>

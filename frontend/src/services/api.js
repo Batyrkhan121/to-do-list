@@ -105,6 +105,7 @@ export const categoriesApi = {
 // Dashboard API
 export const dashboardApi = {
   getStats: () => api.get('/v1/dashboard/'),
+  getTeamStats: () => api.get('/v1/dashboard/team-stats/'),
 };
 
 // Calendar Events API

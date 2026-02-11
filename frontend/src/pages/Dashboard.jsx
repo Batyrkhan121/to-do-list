@@ -2,14 +2,17 @@ import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import StatCard from '../components/StatCard';
 import TaskCard from '../components/TaskCard';
+import TeamProgressCard from '../components/TeamProgressCard';
+import TeamTasksList from '../components/TeamTasksList';
 import { PageTransition, CardAnimation, Skeleton } from '../components/animations/PageTransition';
-import { useDashboard, useCompleteTask } from '../hooks/useApi';
+import { useDashboard, useTeamDashboardStats, useCompleteTask } from '../hooks/useApi';
 
 export default function Dashboard() {
   const { data: stats, isLoading, error } = useDashboard({
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
+  const { data: teamStats, isLoading: teamStatsLoading } = useTeamDashboardStats();
   const completeTask = useCompleteTask();
 
   if (isLoading) {
@@ -246,6 +249,23 @@ export default function Dashboard() {
               )}
             </motion.div>
           </div>
+        </CardAnimation>
+
+        {/* Team Progress Section */}
+        <CardAnimation index={6}>
+          <TeamProgressCard 
+            teams={teamStats?.teams || []}
+            overall={{
+              total: teamStats?.overall_team_total || 0,
+              completed: teamStats?.overall_team_completed || 0,
+              progress: teamStats?.overall_team_progress || 0,
+            }}
+          />
+        </CardAnimation>
+
+        {/* Team Tasks Section */}
+        <CardAnimation index={7}>
+          <TeamTasksList />
         </CardAnimation>
       </main>
     </PageTransition>

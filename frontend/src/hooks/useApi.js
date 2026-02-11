@@ -10,6 +10,15 @@ export const useDashboard = (options = {}) => {
   });
 };
 
+export const useTeamDashboardStats = (options = {}) => {
+  return useQuery({
+    queryKey: ['team-dashboard-stats'],
+    queryFn: () => dashboardApi.getTeamStats().then(res => res.data),
+    refetchInterval: 5000,
+    ...options,
+  });
+};
+
 // ============ TASKS ============
 export const useTasks = (params = {}, options = {}) => {
   return useQuery({
@@ -51,6 +60,7 @@ export const useCompleteTask = () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['team-dashboard-stats'] });
     },
   });
 };

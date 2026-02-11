@@ -400,6 +400,75 @@ def dashboard_stats(request):
     return Response(data)
 
 
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def dashboard_team_stats(request):
+    """Get team statistics for the authenticated user"""
+    user_teams = _user_teams(request.user).filter(is_active=True)
+    
+    teams_data = []
+    overall_team_total = 0
+    overall_team_completed = 0
+    
+    for team in user_teams:
+        total_tasks = team.tasks.count()
+        completed_tasks = team.tasks.filter(is_completed=True).count()
+        progress_percent = _safe_percent(completed_tasks, total_tasks)
+        
+        overall_team_total += total_tasks
+        overall_team_completed += completed_tasks
+        
+        # Build member list
+        members = []
+        team_lead = team.team_lead
+        
+        # Add team lead first
+        try:
+            avatar_url = team_lead.profile.avatar or ''
+        except ObjectDoesNotExist:
+            avatar_url = ''
+        
+        members.append({
+            'id': team_lead.id,
+            'username': team_lead.username,
+            'avatar_url': avatar_url,
+            'is_lead': True,
+        })
+        
+        # Add other members
+        for member in team.members.all():
+            if member.id != team_lead.id:
+                try:
+                    avatar_url = member.profile.avatar or ''
+                except ObjectDoesNotExist:
+                    avatar_url = ''
+                
+                members.append({
+                    'id': member.id,
+                    'username': member.username,
+                    'avatar_url': avatar_url,
+                    'is_lead': False,
+                })
+        
+        teams_data.append({
+            'id': team.id,
+            'name': team.name,
+            'total_tasks': total_tasks,
+            'completed_tasks': completed_tasks,
+            'progress_percent': progress_percent,
+            'members': members,
+        })
+    
+    overall_team_progress = _safe_percent(overall_team_completed, overall_team_total)
+    
+    return Response({
+        'teams': teams_data,
+        'overall_team_total': overall_team_total,
+        'overall_team_completed': overall_team_completed,
+        'overall_team_progress': overall_team_progress,
+    })
+
+
 def _safe_percent(completed, total):
     if total == 0:
         return 0

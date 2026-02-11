@@ -12,4 +12,5 @@ router.register(r'calendar-events', views.CalendarEventViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('dashboard/', views.dashboard_stats, name='dashboard-stats'),
+    path('dashboard/team-stats/', views.dashboard_team_stats, name='dashboard-team-stats'),
 ]

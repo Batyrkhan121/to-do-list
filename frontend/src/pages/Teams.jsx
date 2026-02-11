@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Header from '../components/Header';
 import Modal from '../components/Modal';
-import { useTeams, useCreateTeam, useDeleteTeam } from '../hooks/useApi';
+import { useTeams, useCreateTeam, useDeleteTeam, useTeamDashboardStats } from '../hooks/useApi';
 
 function buildInviteLink(team) {
   if (!team?.invite_code) return '';
@@ -43,10 +43,17 @@ export default function Teams() {
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
   });
+  const { data: teamStats } = useTeamDashboardStats();
   const createTeam = useCreateTeam();
   const deleteTeam = useDeleteTeam();
 
   const teams = data?.results || data || [];
+
+  // Helper function to get team stats
+  const getTeamStatsById = (teamId) => {
+    if (!teamStats?.teams) return null;
+    return teamStats.teams.find(t => t.id === teamId);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -112,6 +119,9 @@ export default function Teams() {
             {teams.map((team) => {
               const people = getTeamPeople(team);
               const inviteLink = buildInviteLink(team);
+              const stats = getTeamStatsById(team.id);
+              const progress = stats?.progress_percent || 0;
+              const progressColor = progress >= 75 ? '#10b981' : progress >= 40 ? '#f59e0b' : '#ef4444';
 
               return (
                 <div key={team.id} className="card" style={{ padding: '24px', position: 'relative' }}>
@@ -150,13 +160,42 @@ export default function Teams() {
                     >
                       {team.name?.slice(0, 1)?.toUpperCase() || 'T'}
                     </div>
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <h3 style={{ margin: 0, fontWeight: '600', fontSize: '18px' }}>{team.name}</h3>
                       <p style={{ margin: '4px 0 0', fontSize: '14px', color: '#64748b' }}>
                         Lead: {team.team_lead?.username || 'Admin'}
                       </p>
                     </div>
                   </div>
+
+                  {/* Progress Bar */}
+                  {stats && (
+                    <div style={{ marginBottom: '16px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '12px', color: '#64748b' }}>Progress</span>
+                        <span style={{ fontSize: '12px', fontWeight: '600', color: progressColor }}>
+                          {progress}%
+                        </span>
+                      </div>
+                      <div style={{
+                        height: '8px',
+                        background: '#e2e8f0',
+                        borderRadius: '999px',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${progress}%`,
+                          background: progressColor,
+                          borderRadius: '999px',
+                          transition: 'width 0.5s ease',
+                        }} />
+                      </div>
+                      <p style={{ fontSize: '11px', color: '#64748b', margin: '4px 0 0' }}>
+                        {stats.completed_tasks} of {stats.total_tasks} tasks done
+                      </p>
+                    </div>
+                  )}
 
                   <div
                     style={{
@@ -184,16 +223,79 @@ export default function Teams() {
                     </div>
                   </div>
 
+                  {/* Member Avatars */}
                   <div style={{ marginTop: '12px' }}>
-                    <p style={{ margin: '0 0 6px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
+                    <p style={{ margin: '0 0 8px', fontSize: '12px', color: '#64748b', fontWeight: '600' }}>
                       Team members
                     </p>
-                    {people.length ? (
-                      <p style={{ margin: 0, fontSize: '13px', color: '#334155' }}>
-                        {people
-                          .map((member) => (member.isLead ? `${member.username} (Lead)` : member.username))
-                          .join(', ')}
-                      </p>
+                    {people.length > 0 ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                        {people.slice(0, 8).map((member, idx) => {
+                          const initials = member.username.slice(0, 2).toUpperCase();
+                          const bgColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+                          const bgColor = bgColors[idx % bgColors.length];
+                          
+                          return (
+                            <div
+                              key={member.id}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                background: bgColor,
+                                border: '2px solid white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '11px',
+                                fontWeight: '600',
+                                color: 'white',
+                                position: 'relative',
+                                boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                              }}
+                              title={member.username + (member.isLead ? ' (Lead)' : '')}
+                            >
+                              {initials}
+                              {member.isLead && (
+                                <div style={{
+                                  position: 'absolute',
+                                  top: '-4px',
+                                  right: '-4px',
+                                  width: '14px',
+                                  height: '14px',
+                                  background: '#fbbf24',
+                                  borderRadius: '50%',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontSize: '8px',
+                                  border: '2px solid white',
+                                }}>
+                                  ⭐
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {people.length > 8 && (
+                          <div style={{
+                            width: '32px',
+                            height: '32px',
+                            borderRadius: '50%',
+                            background: '#64748b',
+                            border: '2px solid white',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            color: 'white',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                          }}>
+                            +{people.length - 8}
+                          </div>
+                        )}
+                      </div>
                     ) : (
                       <p style={{ margin: 0, fontSize: '13px', color: '#94a3b8' }}>No members yet</p>
                     )}

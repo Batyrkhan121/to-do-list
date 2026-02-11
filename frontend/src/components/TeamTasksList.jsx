@@ -8,7 +8,7 @@ export default function TeamTasksList() {
   const completeTask = useCompleteTask();
 
   const tasks = tasksData?.results || tasksData || [];
-  const teamTasks = tasks.filter(task => task.team_id !== null && task.team_id !== undefined);
+  const teamTasks = tasks.filter(task => task.team_id != null);
 
   if (isLoading) {
     return (

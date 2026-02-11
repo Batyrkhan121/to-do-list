@@ -1,37 +1,38 @@
 export default function TaskCard({ task, onComplete, onEdit, isOwnTask = true }) {
   const priorityColors = {
-    low: { bg: '#f0fdf4', text: '#16a34a' },
-    medium: { bg: '#fefce8', text: '#ca8a04' },
-    high: { bg: '#fff7ed', text: '#ea580c' },
-    urgent: { bg: '#fef2f2', text: '#dc2626' },
+    low: { bg: '#dcfce7', text: '#15803d' },
+    medium: { bg: '#fef3c7', text: '#b45309' },
+    high: { bg: '#ffedd5', text: '#c2410c' },
+    urgent: { bg: '#fee2e2', text: '#b91c1c' },
   };
 
   const statusColors = {
-    todo: { bg: '#f1f5f9', text: '#475569' },
-    progress: { bg: '#eff6ff', text: '#2563eb' },
-    review: { bg: '#faf5ff', text: '#9333ea' },
-    done: { bg: '#f0fdf4', text: '#16a34a' },
+    todo: { bg: '#e2e8f0', text: '#334155' },
+    progress: { bg: '#dbeafe', text: '#1d4ed8' },
+    review: { bg: '#ccfbf1', text: '#0f766e' },
+    done: { bg: '#dcfce7', text: '#15803d' },
   };
 
   const priority = priorityColors[task.priority] || priorityColors.medium;
   const status = statusColors[task.status] || statusColors.todo;
   const ownershipBadge = isOwnTask
-    ? { label: 'My task', bg: '#dbeafe', text: '#1d4ed8' }
-    : { label: 'Team task', bg: '#ede9fe', text: '#6d28d9' };
+    ? { label: 'Personal task', bg: '#dbeafe', text: '#1e40af' }
+    : { label: 'Team task', bg: '#ccfbf1', text: '#0f766e' };
   const ownershipSurface = isOwnTask
     ? { border: '#93c5fd', bg: '#f8fbff' }
-    : { border: '#c4b5fd', bg: '#fbf8ff' };
+    : { border: '#5eead4', bg: '#f5fffd' };
 
   return (
     <div 
       className="card"
       onClick={() => onEdit?.(task)}
-      style={{ 
-        padding: '16px', 
+      style={{
+        padding: '16px',
         cursor: 'pointer',
         opacity: task.is_completed ? 0.6 : 1,
         borderLeft: `4px solid ${ownershipSurface.border}`,
         background: ownershipSurface.bg,
+        transition: 'transform 0.2s ease, box-shadow 0.2s ease',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
@@ -47,7 +48,7 @@ export default function TaskCard({ task, onComplete, onEdit, isOwnTask = true })
             height: '22px',
             borderRadius: '6px',
             border: task.is_completed ? 'none' : '2px solid #cbd5e1',
-            backgroundColor: task.is_completed ? '#10b981' : 'transparent',
+            backgroundColor: task.is_completed ? '#0ea5a4' : 'transparent',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
@@ -84,7 +85,7 @@ export default function TaskCard({ task, onComplete, onEdit, isOwnTask = true })
           </div>
 
           {/* Meta */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', fontSize: '12px', color: '#64748b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '12px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap' }}>
             {task.due_date && (
               <span>Due: {task.due_date}</span>
             )}

@@ -64,6 +64,7 @@ class TeamDetailSerializer(serializers.ModelSerializer):
 class TaskListSerializer(serializers.ModelSerializer):
     responsible = UserSerializer(read_only=True)
     category = CategorySerializer(read_only=True)
+    team_id = serializers.IntegerField(source='team.id', read_only=True)
     team_name = serializers.CharField(source='team.name', read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
     priority_level = serializers.ReadOnlyField()
@@ -73,7 +74,7 @@ class TaskListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'status', 'priority', 'priority_level',
             'due_date', 'is_completed', 'is_overdue', 'responsible',
-            'category', 'team_name', 'created_at'
+            'category', 'team_id', 'team_name', 'created_at'
         ]
 
 

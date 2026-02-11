@@ -4,7 +4,6 @@ import TaskCard from '../components/TaskCard';
 import Modal from '../components/Modal';
 import TaskForm from '../components/TaskForm';
 import { useTasks, useCreateTask, useUpdateTask, useCompleteTask, useDeleteTask } from '../hooks/useApi';
-import { useAuth } from '../context/AuthContext';
 
 function TaskGridSection({
   title,
@@ -34,7 +33,7 @@ function TaskGridSection({
       </div>
 
       {tasks.length > 0 ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '16px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
           {tasks.map((task) => (
             <div key={task.id} style={{ position: 'relative' }}>
               <TaskCard
@@ -98,7 +97,7 @@ function CompletionCard({ title, color, stats }) {
         />
       </div>
 
-      <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b' }}>
+      <div style={{ display: 'flex', gap: '12px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap' }}>
         <span>Total: {stats.total}</span>
         <span>Done: {stats.completed}</span>
         <span>Pending: {stats.pending}</span>
@@ -107,12 +106,18 @@ function CompletionCard({ title, color, stats }) {
   );
 }
 
+function isTeamTask(task) {
+  if (task?.team_name) return true;
+  if (task?.team_id) return true;
+  if (task?.team?.id) return true;
+  return false;
+}
+
 export default function Tasks() {
   const [filters, setFilters] = useState({ status: '', priority: '' });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
 
-  const { user } = useAuth();
   const syncOptions = {
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
@@ -124,18 +129,18 @@ export default function Tasks() {
   const deleteTask = useDeleteTask();
 
   const tasks = data?.results || data || [];
-  const currentUserId = user?.id ?? null;
 
-  const ownTasks = useMemo(
-    () => tasks.filter((task) => task.responsible?.id === currentUserId),
-    [tasks, currentUserId]
+  const personalTasks = useMemo(
+    () => tasks.filter((task) => !isTeamTask(task)),
+    [tasks]
   );
   const teamTasks = useMemo(
-    () => tasks.filter((task) => task.responsible?.id !== currentUserId),
-    [tasks, currentUserId]
+    () => tasks.filter((task) => isTeamTask(task)),
+    [tasks]
   );
+
   const allStats = useMemo(() => getCompletionStats(tasks), [tasks]);
-  const ownStats = useMemo(() => getCompletionStats(ownTasks), [ownTasks]);
+  const personalStats = useMemo(() => getCompletionStats(personalTasks), [personalTasks]);
   const teamStats = useMemo(() => getCompletionStats(teamTasks), [teamTasks]);
 
   const getApiErrorMessage = (err) => {
@@ -180,12 +185,14 @@ export default function Tasks() {
   };
 
   const handleDelete = async (taskId) => {
-    if (window.confirm('Are you sure you want to delete this task?')) {
-      try {
-        await deleteTask.mutateAsync(taskId);
-      } catch (err) {
-        alert('Error deleting task');
-      }
+    if (!window.confirm('Are you sure you want to delete this task?')) {
+      return;
+    }
+
+    try {
+      await deleteTask.mutateAsync(taskId);
+    } catch {
+      alert('Error deleting task');
     }
   };
 
@@ -211,17 +218,17 @@ export default function Tasks() {
     <div style={{ minHeight: '100vh' }}>
       <Header
         title="Tasks"
-        subtitle={`${tasks.length} total • ${ownTasks.length} mine • ${teamTasks.length} team`}
+        subtitle={`${tasks.length} total | ${personalTasks.length} personal | ${teamTasks.length} team`}
         onAddClick={handleCreate}
         addButtonText="New Task"
       />
 
-      <main style={{ padding: '32px' }}>
+      <main className="page-main">
         <div className="card" style={{ padding: '16px', marginBottom: '24px' }}>
           <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
             <select
               value={filters.status}
-              onChange={(event) => setFilters((f) => ({ ...f, status: event.target.value }))}
+              onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
               className="input"
               style={{ width: 'auto' }}
             >
@@ -234,7 +241,7 @@ export default function Tasks() {
 
             <select
               value={filters.priority}
-              onChange={(event) => setFilters((f) => ({ ...f, priority: event.target.value }))}
+              onChange={(event) => setFilters((current) => ({ ...current, priority: event.target.value }))}
               className="input"
               style={{ width: 'auto' }}
             >
@@ -255,7 +262,7 @@ export default function Tasks() {
             )}
           </div>
           <p style={{ margin: '10px 0 0', fontSize: '12px', color: '#64748b' }}>
-            Auto-sync is enabled: task updates from teammates appear every 5 seconds.
+            Auto-sync is enabled: updates from teammates appear every 5 seconds.
           </p>
         </div>
 
@@ -268,22 +275,22 @@ export default function Tasks() {
           }}
         >
           <CompletionCard title="All tasks progress" color="#0ea5e9" stats={allStats} />
-          <CompletionCard title="My tasks progress" color="#1d4ed8" stats={ownStats} />
-          <CompletionCard title="Team tasks progress" color="#6d28d9" stats={teamStats} />
+          <CompletionCard title="Personal tasks progress" color="#1d4ed8" stats={personalStats} />
+          <CompletionCard title="Team tasks progress" color="#0f766e" stats={teamStats} />
         </div>
 
         {error ? (
           <div style={{ backgroundColor: '#fef2f2', color: '#dc2626', padding: '16px', borderRadius: '12px' }}>
-            Error: {error.message}. Make sure Django is running!
+            Error: {error.message}. Make sure Django is running.
           </div>
         ) : tasks.length > 0 ? (
           <div style={{ display: 'grid', gap: '24px' }}>
             <TaskGridSection
-              title="My tasks"
-              count={ownTasks.length}
+              title="Personal tasks"
+              count={personalTasks.length}
               dotColor="#1d4ed8"
               sectionColor="#1d4ed8"
-              tasks={ownTasks}
+              tasks={personalTasks}
               isOwnTask={true}
               onComplete={(id) => completeTask.mutate(id)}
               onEdit={handleEdit}
@@ -294,8 +301,8 @@ export default function Tasks() {
             <TaskGridSection
               title="Team tasks"
               count={teamTasks.length}
-              dotColor="#6d28d9"
-              sectionColor="#6d28d9"
+              dotColor="#0f766e"
+              sectionColor="#0f766e"
               tasks={teamTasks}
               isOwnTask={false}
               onComplete={(id) => completeTask.mutate(id)}
@@ -306,7 +313,7 @@ export default function Tasks() {
           </div>
         ) : (
           <div style={{ textAlign: 'center', padding: '64px' }}>
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>Tasks</div>
+            <div style={{ fontSize: '40px', marginBottom: '16px', color: '#0ea5e9' }}>No tasks</div>
             <h3 style={{ fontSize: '18px', fontWeight: '500', marginBottom: '8px' }}>No tasks found</h3>
             <p style={{ color: '#64748b', marginBottom: '16px' }}>Create your first task to get started</p>
             <button onClick={handleCreate} className="btn btn-primary">
@@ -336,4 +343,3 @@ export default function Tasks() {
     </div>
   );
 }
-

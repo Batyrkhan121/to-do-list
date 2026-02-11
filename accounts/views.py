@@ -146,7 +146,7 @@ def login(request):
             'refresh': str(refresh),
             'user': UserSerializer(user).data,
             'joined_team': _team_payload(joined_team),
-            'redirect_path': f"/dashboard/team/{joined_team.id}/" if joined_team else None,
+            'redirect_path': '/teams' if joined_team else None,
         })
     
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

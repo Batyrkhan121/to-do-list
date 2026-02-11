@@ -4,10 +4,8 @@ import StatCard from '../components/StatCard';
 import TaskCard from '../components/TaskCard';
 import { PageTransition, CardAnimation, Skeleton } from '../components/animations/PageTransition';
 import { useDashboard, useCompleteTask } from '../hooks/useApi';
-import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
-  const { user } = useAuth();
   const { data: stats, isLoading, error } = useDashboard({
     refetchInterval: 5000,
     refetchIntervalInBackground: true,
@@ -18,9 +16,9 @@ export default function Dashboard() {
     return (
       <PageTransition>
         <Header title="Dashboard" subtitle="Loading..." />
-        <main style={{ padding: '32px' }}>
+        <main className="page-main">
           {/* Skeleton для статистики */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '24px', marginBottom: '32px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '24px', marginBottom: '32px' }}>
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="card" style={{ padding: '24px' }}>
                 <Skeleton width="60%" height="16px" />
@@ -48,7 +46,7 @@ export default function Dashboard() {
   if (error) {
     return (
       <PageTransition>
-        <div style={{ padding: '32px' }}>
+        <div className="page-main">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -80,7 +78,7 @@ export default function Dashboard() {
         subtitle="Welcome back! Here's your productivity overview."
       />
 
-      <main style={{ padding: '32px' }}>
+      <main className="page-main">
         {/* Stats Grid */}
         <div style={{ 
           display: 'grid', 
@@ -112,7 +110,7 @@ export default function Dashboard() {
               title="In Progress"
               value={stats?.in_progress_tasks || 0}
               icon="🚀"
-              color="purple"
+              color="orange"
             />
           </CardAnimation>
           
@@ -132,7 +130,7 @@ export default function Dashboard() {
             <h3 style={{ marginTop: 0, marginBottom: '20px', fontWeight: '600' }}>
               📊 Productivity Score
             </h3>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '32px', flexWrap: 'wrap' }}>
               {/* Circular Progress */}
               <div style={{ position: 'relative', width: '120px', height: '120px' }}>
                 <svg width="120" height="120" style={{ transform: 'rotate(-90deg)' }}>
@@ -178,7 +176,7 @@ export default function Dashboard() {
               
               {/* Stats breakdown */}
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', gap: '24px' }}>
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap' }}>
                   <div>
                     <p style={{ color: '#64748b', fontSize: '14px', margin: 0 }}>Active Projects</p>
                     <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '4px 0 0' }}>
@@ -227,7 +225,7 @@ export default function Dashboard() {
                   >
                     <TaskCard 
                       task={task} 
-                      isOwnTask={task.responsible?.id === user?.id}
+                      isOwnTask={!task?.team_id && !task?.team_name}
                       onComplete={(id) => completeTask.mutate(id)}
                     />
                   </motion.div>

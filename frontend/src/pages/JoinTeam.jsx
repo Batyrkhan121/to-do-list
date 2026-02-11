@@ -9,8 +9,11 @@ export default function JoinTeam() {
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, loading } = useAuth();
-  const identifier = inviteCode || teamId;
-  const isCodeMode = Boolean(inviteCode);
+
+  const inviteCodeFromQuery = searchParams.get('invite_code');
+  const effectiveInviteCode = inviteCode || inviteCodeFromQuery || null;
+  const identifier = effectiveInviteCode || teamId;
+  const isCodeMode = Boolean(effectiveInviteCode);
 
   const [localMessage, setLocalMessage] = useState('');
   const [messageType, setMessageType] = useState('info');
@@ -19,8 +22,8 @@ export default function JoinTeam() {
 
   const joinTeam = useJoinTeam();
   const joinTeamByCode = useJoinTeamByCode();
-  const inviteById = useTeamInviteInfo(teamId);
-  const inviteByCode = useTeamInviteInfoByCode(inviteCode);
+  const inviteById = useTeamInviteInfo(isCodeMode ? null : teamId);
+  const inviteByCode = useTeamInviteInfoByCode(effectiveInviteCode);
   const inviteDataSource = isCodeMode ? inviteByCode : inviteById;
   const inviteInfo = inviteDataSource.data;
   const inviteLoading = inviteDataSource.isLoading;
@@ -65,7 +68,7 @@ export default function JoinTeam() {
     setMessageType('info');
     try {
       const result = isCodeMode
-        ? await joinTeamByCode.mutateAsync(inviteCode)
+        ? await joinTeamByCode.mutateAsync(effectiveInviteCode)
         : await joinTeam.mutateAsync(teamId);
       setJoined(true);
       setMessageType('success');
@@ -88,7 +91,7 @@ export default function JoinTeam() {
       setMessageType('info');
       try {
         const result = isCodeMode
-          ? await joinTeamByCode.mutateAsync(inviteCode)
+          ? await joinTeamByCode.mutateAsync(effectiveInviteCode)
           : await joinTeam.mutateAsync(teamId);
         setJoined(true);
         setMessageType('success');
@@ -110,7 +113,7 @@ export default function JoinTeam() {
     joinTeam,
     joinTeamByCode,
     isCodeMode,
-    inviteCode,
+    effectiveInviteCode,
     teamId,
   ]);
 
@@ -128,8 +131,9 @@ export default function JoinTeam() {
         className="card"
         style={{
           maxWidth: '560px',
-          margin: '64px auto',
-          padding: '32px',
+          margin: 'clamp(20px, 8vh, 64px) auto',
+          padding: 'clamp(18px, 4vw, 32px)',
+          boxSizing: 'border-box',
         }}
       >
         <h1 style={{ margin: 0, fontSize: '28px' }}>Team Invitation</h1>
